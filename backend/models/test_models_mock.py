@@ -1,7 +1,11 @@
 # models/test_models_mock.py
 # Runs the trained models against hand-written mock requests.
+from pathlib import Path
+
 import joblib
 import pandas as pd
+
+MODELS_DIR = Path(__file__).resolve().parent
 
 MOCK_REQUESTS = [
     {"user_id": "user_1_cinephile", "hour": 22, "day_of_week": "Sunday", "app": "Criterion"},
@@ -21,10 +25,10 @@ def encode(encoder, value):
 
 
 def test_predict_genre(request):
-    model = joblib.load("predict_genre_model.pkl")
-    user_encoder = joblib.load("predict_genre_user_encoder.pkl")
-    app_encoder = joblib.load("predict_genre_app_encoder.pkl")
-    day_encoder = joblib.load("predict_genre_day_encoder.pkl")
+    model = joblib.load(MODELS_DIR / "predict_genre_model.pkl")
+    user_encoder = joblib.load(MODELS_DIR / "predict_genre_user_encoder.pkl")
+    app_encoder = joblib.load(MODELS_DIR / "predict_genre_app_encoder.pkl")
+    day_encoder = joblib.load(MODELS_DIR / "predict_genre_day_encoder.pkl")
 
     user = encode(user_encoder, request["user_id"])
     app = encode(app_encoder, request["app"])
@@ -41,9 +45,9 @@ def test_predict_genre(request):
 
 
 def test_predict_movie(request, genre):
-    model = joblib.load("predict_movie_model.pkl")
-    user_encoder = joblib.load("predict_movie_user_encoder.pkl")
-    genre_encoder = joblib.load("predict_movie_genre_encoder.pkl")
+    model = joblib.load(MODELS_DIR / "predict_movie_model.pkl")
+    user_encoder = joblib.load(MODELS_DIR / "predict_movie_user_encoder.pkl")
+    genre_encoder = joblib.load(MODELS_DIR / "predict_movie_genre_encoder.pkl")
 
     user = encode(user_encoder, request["user_id"])
     genre_encoded = encode(genre_encoder, genre)
@@ -59,9 +63,9 @@ def test_predict_movie(request, genre):
 
 
 def test_predict_user_preference(request):
-    model = joblib.load("predict_user_preference_model.pkl")
-    user_encoder = joblib.load("predict_user_preference_user_encoder.pkl")
-    day_encoder = joblib.load("predict_user_preference_day_encoder.pkl")
+    model = joblib.load(MODELS_DIR / "predict_user_preference_model.pkl")
+    user_encoder = joblib.load(MODELS_DIR / "predict_user_preference_user_encoder.pkl")
+    day_encoder = joblib.load(MODELS_DIR / "predict_user_preference_day_encoder.pkl")
 
     user = encode(user_encoder, request["user_id"])
     day = encode(day_encoder, request["day_of_week"])

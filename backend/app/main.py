@@ -7,12 +7,12 @@ from pydantic import BaseModel
 import joblib
 import pandas as pd
 
-import database
-import recommender
+from db import database
+from recommender import recommender
 
 app = FastAPI(title="CTV ML Recommender")
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parents[1] / "models"
 
 # Each model is a bundle: the classifier plus the LabelEncoders it needs.
 MODEL_SPECS = {

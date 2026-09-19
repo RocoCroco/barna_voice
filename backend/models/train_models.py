@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 MODELS_DIR = Path(__file__).resolve().parent
-REPO_ROOT = MODELS_DIR.parent  # scripts read tv_logs.db from the repo root
+BACKEND_DIR = MODELS_DIR.parent
 
 
 def discover_scripts() -> list[Path]:
@@ -25,7 +25,7 @@ def run_all() -> int:
     failures = []
     for script in scripts:
         print(f"\n{'=' * 60}\nRunning {script.name}\n{'=' * 60}")
-        result = subprocess.run([sys.executable, str(script)], cwd=REPO_ROOT)
+        result = subprocess.run([sys.executable, str(script)], cwd=BACKEND_DIR)
         if result.returncode != 0:
             failures.append(script.name)
             print(f"-> {script.name} FAILED (exit {result.returncode})")

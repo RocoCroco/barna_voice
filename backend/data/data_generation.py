@@ -1,10 +1,12 @@
 import json
 import random
+from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
 
 # Real movie catalog used to give each log an authentic title per genre.
-MOVIE_CSV = "/home/inv00606/Desktop/TMDB_movie_dataset_v11.csv"
+DATA_DIR = Path(__file__).resolve().parent
+MOVIE_CSV = str(DATA_DIR / "movie_dataset.csv")
 
 # Persona genres mapped to the genre labels used in the TMDB dataset.
 GENRE_MAP = {
@@ -135,6 +137,6 @@ def generate_logs(events_per_user=500):
 
 if __name__ == "__main__":
     dataset = generate_logs(events_per_user=500)
-    with open("tv_logs.json", "w") as f:
+    with open(DATA_DIR / "tv_logs.json", "w") as f:
         json.dump(dataset, f, indent=2)
     print(f"Generated {len(dataset)} historical logs for {len(PROFILES)} demo users.")

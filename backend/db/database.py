@@ -1,8 +1,9 @@
 import sqlite3
 import json
+from pathlib import Path
 from typing import List, Dict, Any
 
-DB_NAME = "tv_logs.db"
+DB_NAME = str(Path(__file__).resolve().parent / "tv_logs.db")
 
 def get_db():
     conn = sqlite3.connect(DB_NAME)
@@ -206,5 +207,5 @@ def update_db_from_json(json_file_path: str) -> int:
 
 if __name__ == "__main__":
     init_db()
-    update_db_from_json("tv_logs.json")
+    update_db_from_json(str(Path(__file__).resolve().parents[1] / "data" / "tv_logs.json"))
     print("Database initialized successfully.")
