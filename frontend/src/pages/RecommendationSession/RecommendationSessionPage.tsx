@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { VoiceSessionBackground } from '../../components/backgrounds/VoiceSessionBackground';
 import { ContentCard } from '../../components/ContentCard';
 import { focusManager } from '../../navigation/FocusManager';
+import { useReducedMotion } from '../../navigation/useReducedMotion';
 import { contentService } from '../../services/content.service';
 import { useProfileStore } from '../../store/profile.store';
 import { useRecommendationStore } from '../../store/recommendation.store';

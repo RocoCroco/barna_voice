@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { motion, useReducedMotion } from 'motion/react';
+import { motion } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { focusManager } from '../../navigation/FocusManager';
+import { useReducedMotion } from '../../navigation/useReducedMotion';
 import { profilesService } from '../../services/profiles.service';
 import { useProfileStore } from '../../store/profile.store';
 import type { Profile } from '../../types/profile';
