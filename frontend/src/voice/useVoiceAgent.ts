@@ -40,7 +40,9 @@ export function useVoiceAgent() {
   );
 
   const simulateTurn = useCallback(async () => {
-    await voiceProvider.startListening();
+    if (voiceProvider.isConnected()) {
+      await voiceProvider.startListening();
+    }
     setStatus('listening');
     setPhase('listening');
     setTranscript(simulatedPhrases[Math.min(round, simulatedPhrases.length - 1)]);
@@ -48,7 +50,9 @@ export function useVoiceAgent() {
 
     setStatus('processing');
     setPhase('processing');
-    await voiceProvider.stopListening();
+    if (voiceProvider.isConnected()) {
+      await voiceProvider.stopListening();
+    }
     await wait(550);
 
     advance();

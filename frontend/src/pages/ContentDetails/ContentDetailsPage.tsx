@@ -3,15 +3,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ContentCard } from '../../components/ContentCard';
 import { TVButton } from '../../components/TVButton';
 import { contentService } from '../../services/content.service';
-import { useWatchlistStore } from '../../store/watchlist.store';
 
 export function ContentDetailsPage() {
   const { contentId = '' } = useParams();
   const navigate = useNavigate();
   const [selectionMessage, setSelectionMessage] = useState('');
   const content = contentService.getById(contentId);
-  const contentIds = useWatchlistStore((state) => state.contentIds);
-  const toggleWatchlist = useWatchlistStore((state) => state.toggle);
 
   if (!content) {
     return (
@@ -25,7 +22,6 @@ export function ContentDetailsPage() {
     );
   }
 
-  const isSaved = contentIds.includes(content.id);
   const related = contentService
     .getAll()
     .filter((item) => item.id !== content.id)
@@ -55,9 +51,6 @@ export function ContentDetailsPage() {
             >
               Choose this
             </TVButton>
-            <TVButton onClick={() => toggleWatchlist(content.id)}>
-              {isSaved ? 'Remove from my list' : 'Add to my list'}
-            </TVButton>
             <TVButton variant="ghost" onClick={() => navigate(-1)}>
               Back to shortlist
             </TVButton>
@@ -80,4 +73,3 @@ export function ContentDetailsPage() {
     </div>
   );
 }
-

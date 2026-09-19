@@ -5,8 +5,6 @@ import { HomePage } from '../pages/Home/HomePage';
 import { NotFoundPage } from '../pages/NotFound/NotFoundPage';
 import { ProfileSelectionPage } from '../pages/ProfileSelection/ProfileSelectionPage';
 import { RecommendationSessionPage } from '../pages/RecommendationSession/RecommendationSessionPage';
-import { SearchPage } from '../pages/Search/SearchPage';
-import { WatchlistPage } from '../pages/Watchlist/WatchlistPage';
 import { useProfileStore } from '../store/profile.store';
 
 function AppRoutes() {
@@ -30,8 +28,6 @@ function AppRoutes() {
       <Route path="/" element={<HomePage />} />
       <Route path="/recommendations" element={<RecommendationSessionPage />} />
       <Route path="/content/:contentId" element={<ContentDetailsPage />} />
-      <Route path="/search" element={<SearchPage />} />
-      <Route path="/watchlist" element={<WatchlistPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

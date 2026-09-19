@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { VoiceSessionBackground } from '../../components/backgrounds/VoiceSessionBackground';
 import { ContentCard } from '../../components/ContentCard';
 import { focusManager } from '../../navigation/FocusManager';
 import { contentService } from '../../services/content.service';
@@ -12,31 +13,84 @@ import { useVoiceAgent } from '../../voice/useVoiceAgent';
 const validModes: RecommendationMode[] = ['discover', 'consensus', 'decide'];
 
 type DemoState = 'listening' | 'transcript' | 'question' | 'processing' | 'recommendations';
+type TranscriptRole = 'you' | 'compass';
+
+interface TranscriptEntry {
+  id: number;
+  role: TranscriptRole;
+  text: string;
+}
 
 const stateCopy: Record<Exclude<DemoState, 'recommendations'>, {
-  label: string;
   caption: string;
-  captionLabel?: string;
 }> = {
   listening: {
-    label: 'Listening',
     caption: 'Just talk it out…',
   },
   transcript: {
-    label: 'Listening',
-    captionLabel: 'You said',
     caption: 'Something clever and exciting, but not too intense.',
   },
   question: {
-    label: 'Compass',
-    captionLabel: 'One quick question',
     caption: 'Are you watching alone or with someone tonight?',
   },
   processing: {
-    label: 'Thinking…',
     caption: 'Shaping recommendations from what you said…',
   },
 };
+
+const nonTranscriptMessages = new Set([
+  'just talk it out…',
+  'compass is thinking…',
+  'connecting to compass…',
+  'shaping recommendations from what you said…',
+  'conversation paused. explore these options with your remote.',
+  'i am listening. what would you like to change?',
+]);
+
+function TranscriptTrail({
+  entries,
+  placement,
+  reduceMotion,
+  emptyMessage,
+}: {
+  entries: TranscriptEntry[];
+  placement: 'conversation' | 'results';
+  reduceMotion: boolean;
+  emptyMessage?: string;
+}) {
+  const visibleEntries = entries.slice(-3).reverse();
+
+  return (
+    <div
+      className={`transcript-trail transcript-trail--${placement}`}
+      aria-live="polite"
+      aria-label="Conversation transcript"
+    >
+      <AnimatePresence initial={false} mode="popLayout">
+        {visibleEntries.map((entry, index) => (
+          <motion.div
+            layout={reduceMotion ? false : 'position'}
+            key={entry.id}
+            className="transcript-trail__entry"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -18, scale: 1.04 }}
+            animate={{
+              opacity: 1 - index * 0.31,
+              scale: 1 - index * 0.1,
+            }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.76 }}
+            transition={{ duration: reduceMotion ? 0.01 : 0.36, ease: [0.22, 1, 0.36, 1] }}
+          >
+            <span>{entry.role === 'you' ? 'You' : 'Compass'}</span>
+            <p>{entry.text}</p>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      {visibleEntries.length === 0 && emptyMessage && (
+        <p className="transcript-trail__empty">{emptyMessage}</p>
+      )}
+    </div>
+  );
+}
 
 export function RecommendationSessionPage() {
   const navigate = useNavigate();
@@ -50,6 +104,9 @@ export function RecommendationSessionPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUpdatingResults, setIsUpdatingResults] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
+  const transcriptSequence = useRef(0);
+  const lastObservedTranscript = useRef('');
   const shouldReduceMotion = useReducedMotion();
   const activeProfileId = useProfileStore((state) => state.activeProfile?.id);
   const phase = useRecommendationStore((state) => state.phase);
@@ -77,15 +134,51 @@ export function RecommendationSessionPage() {
 
   const isPaused = phase === 'exploring';
   const isConversationScene = demoState !== 'recommendations';
-  const liveListeningCopy: { label: string; caption: string; captionLabel?: string } = {
-    label: status === 'speaking' ? 'Compass' : status === 'processing' ? 'Thinking…' : 'Listening',
-    caption: transcript || 'Just talk it out…',
-  };
-  const currentCopy = isConversationScene
-    ? demoState === 'listening'
-      ? liveListeningCopy
-      : stateCopy[demoState]
-    : null;
+  const auroraActive = isConversationScene && !isPaused && !isEnding;
+  const orbStateLabel = demoState === 'processing'
+    ? 'Thinking…'
+    : demoState === 'question'
+      ? 'Speaking'
+      : demoState === 'transcript'
+        ? 'Listening'
+        : status === 'speaking'
+          ? 'Speaking'
+          : status === 'processing'
+            ? 'Thinking…'
+            : 'Listening';
+
+  const addTranscript = useCallback((role: TranscriptRole, value: string) => {
+    const text = value.trim();
+    if (!text || nonTranscriptMessages.has(text.toLowerCase())) return;
+
+    setTranscriptHistory((entries) => {
+      const previous = entries.at(-1);
+      if (previous?.role === role) {
+        const nextText = role === 'you'
+          ? text
+          : text.startsWith(previous.text)
+            ? text
+            : previous.text.includes(text)
+              ? previous.text
+              : `${previous.text} ${text}`;
+
+        if (nextText === previous.text) return entries;
+        return [...entries.slice(0, -1), { ...previous, text: nextText }];
+      }
+
+      transcriptSequence.current += 1;
+      return [
+        ...entries,
+        { id: transcriptSequence.current, role, text },
+      ].slice(-5);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (transcript === lastObservedTranscript.current) return;
+    lastObservedTranscript.current = transcript;
+    addTranscript(status === 'speaking' ? 'compass' : 'you', transcript);
+  }, [addTranscript, status, transcript]);
 
   const showRecommendations = useCallback(async () => {
     if (isGenerating) return;
@@ -114,9 +207,15 @@ export function RecommendationSessionPage() {
       return;
     }
 
+    if (nextState === 'transcript') {
+      addTranscript('you', stateCopy.transcript.caption);
+    } else if (nextState === 'question') {
+      addTranscript('compass', stateCopy.question.caption);
+    }
+
     setDemoState(nextState);
     window.setTimeout(() => focusManager.focusInitial(), 60);
-  }, [showRecommendations]);
+  }, [addTranscript, showRecommendations]);
 
   useEffect(() => {
     const handleDemoShortcut = (event: KeyboardEvent) => {
@@ -182,10 +281,14 @@ export function RecommendationSessionPage() {
   return (
     <LayoutGroup id="voice-session">
       <div className={`voice-session-frame ${isEnding ? 'voice-session-frame--ending' : ''}`}>
+        <VoiceSessionBackground
+          auroraActive={auroraActive}
+          reduceMotion={Boolean(shouldReduceMotion)}
+        />
         <img className="voice-session__logo" src="/brand/logo.svg" alt="Compass" />
 
         <AnimatePresence initial={false} mode="sync">
-          {isConversationScene && currentCopy ? (
+          {isConversationScene ? (
             <motion.div
               key="conversation"
               className={`voice-session voice-session--conversation voice-session-state--${demoState}`}
@@ -226,31 +329,24 @@ export function RecommendationSessionPage() {
                   >
                     <AnimatePresence mode="wait" initial={false}>
                       <motion.span
-                        key={currentCopy.label}
+                        key={orbStateLabel}
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
                         transition={{ duration: 0.2 }}
                       >
-                        {currentCopy.label}
+                        {orbStateLabel}
                       </motion.span>
                     </AnimatePresence>
                   </motion.button>
                 </div>
 
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div
-                    key={demoState}
-                    className={`listening-stage__caption listening-stage__caption--${demoState}`}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: shouldReduceMotion ? 0.01 : 0.3 }}
-                  >
-                    {currentCopy.captionLabel && <span>{currentCopy.captionLabel}</span>}
-                    <p>{currentCopy.caption}</p>
-                  </motion.div>
-                </AnimatePresence>
+                <TranscriptTrail
+                  entries={transcriptHistory}
+                  placement="conversation"
+                  reduceMotion={Boolean(shouldReduceMotion)}
+                  emptyMessage={orbStateLabel === 'Listening' ? stateCopy.listening.caption : undefined}
+                />
                 <span className="sr-only">{transcript}</span>
               </section>
             </motion.div>
@@ -310,6 +406,12 @@ export function RecommendationSessionPage() {
                 </p>
                 <span className="sr-only">{transcript}</span>
               </aside>
+
+              <TranscriptTrail
+                entries={transcriptHistory}
+                placement="results"
+                reduceMotion={Boolean(shouldReduceMotion)}
+              />
             </motion.div>
           )}
         </AnimatePresence>

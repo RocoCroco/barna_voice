@@ -126,9 +126,6 @@ export function HomePage() {
         <section className="home-recommendations" aria-labelledby="tonight-title">
           <div className="section-heading">
             <h2 id="tonight-title">Ideas for tonight</h2>
-            <TVLink to="/search" className="text-link">
-              See everything <ArrowRight aria-hidden="true" />
-            </TVLink>
           </div>
           <div className="content-row">
             {featured.map((content) => (

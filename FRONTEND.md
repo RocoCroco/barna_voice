@@ -20,9 +20,13 @@ La interfaz visible está en inglés. Esta documentación técnica está en espa
 - Sesión de voz real mediante Pipecat Client y SmallWebRTC.
 - Reproducción del audio remoto del agente en el navegador.
 - Estados visuales de escucha, transcripción, pregunta y procesamiento.
+- Fondo WebGL de sesión con Molten Metal persistente y Soft Aurora activa solo
+  durante la conversación.
+- Historial de transcripción escalonado bajo la esfera y reubicado al pie al
+  mostrar resultados.
 - Cuadrícula animada de ocho recomendaciones simuladas.
 - Pausa y reanudación desde la esfera lateral.
-- Catálogo, detalle y watchlist básicos con contenido simulado.
+- Detalle de contenido accesible desde las recomendaciones simuladas.
 - Respeto de `prefers-reduced-motion`.
 
 ### Pendiente del backend
@@ -31,7 +35,7 @@ La interfaz visible está en inglés. Esta documentación técnica está en espa
 - Catálogo y disponibilidad por proveedor.
 - Recomendaciones reales y razones explicables.
 - Eventos estructurados enviados por el agente para actualizar la cuadrícula.
-- Watchlist persistente y acción final de reproducción o deep link.
+- Acción final de reproducción o deep link.
 
 ## Stack
 
@@ -41,8 +45,9 @@ La interfaz visible está en inglés. Esta documentación técnica está en espa
 | TypeScript | Contratos entre UI, stores, servicios y voz |
 | Vite | Desarrollo y build |
 | React Router | Rutas y retorno entre pantallas |
-| Zustand | Estado de perfil, voz, recomendaciones y watchlist |
+| Zustand | Estado de perfil, voz y recomendaciones |
 | Motion for React | Transiciones de escena, shared layout y stagger |
+| OGL | Shaders WebGL adaptados de React Bits para los fondos de voz |
 | Lucide | Iconos de interfaz |
 | Plus Jakarta Sans Semibold | Tipografía visible |
 | Pipecat Client JS | Cliente del agente de voz |
@@ -59,7 +64,7 @@ frontend/
 │   ├── app/                   # router principal
 │   ├── components/            # primitivas reutilizables para TV
 │   ├── navigation/            # foco espacial y eventos del mando
-│   ├── pages/                 # perfiles, Home, sesión, catálogo y detalle
+│   ├── pages/                 # perfiles, Home, sesión y detalle
 │   ├── services/              # frontera con mocks y futuro backend
 │   ├── store/                 # stores Zustand separados por dominio
 │   ├── styles/                # diseño global y estados visuales

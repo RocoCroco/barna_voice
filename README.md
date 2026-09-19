@@ -181,7 +181,7 @@ The frontend and voice layers are ready to receive a backend contract for:
 3. recommendation and refinement tools called by the voice agent;
 4. structured events that update the visible grid without ending the voice
    session;
-5. content detail, watchlist and playback/deep-link actions.
+5. content detail and playback/deep-link actions.
 
 Until that contract exists, profiles, catalogue content and recommendation
 rounds remain deliberately labelled simulations.
