@@ -6,3 +6,4 @@ python-dotenv
 scikit-learn
 pandas
 joblib
+pytest

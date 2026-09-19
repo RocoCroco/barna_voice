@@ -1,9 +1,46 @@
 import json
 import random
 from datetime import datetime, timedelta
-from faker import Faker
+import pandas as pd
 
-fake = Faker()
+# Real movie catalog used to give each log an authentic title per genre.
+MOVIE_CSV = "/home/inv00606/Desktop/TMDB_movie_dataset_v11.csv"
+
+# Persona genres mapped to the genre labels used in the TMDB dataset.
+GENRE_MAP = {
+    "Drama": "Drama",
+    "Thriller": "Thriller",
+    "Indie": "Drama",
+    "Action": "Action",
+    "Sci-Fi": "Science Fiction",
+    "Animation": "Animation",
+    "Family": "Family",
+    "Anime": "Animation",
+    "Comedy": "Comedy",
+    "Sitcom": "Comedy",
+}
+
+# How many of the most-voted titles to keep per genre (keeps names recognizable).
+TITLES_PER_GENRE = 400
+
+
+def build_title_pools():
+    """Returns {persona_genre: [real titles]} sourced from the TMDB catalog."""
+    df = pd.read_csv(MOVIE_CSV, usecols=["title", "genres", "vote_count"])
+    df = df.dropna(subset=["title", "genres"])
+
+    pools = {}
+    for persona_genre, tmdb_genre in GENRE_MAP.items():
+        if persona_genre in pools:
+            continue
+        matches = df[df["genres"].str.contains(tmdb_genre, na=False)]
+        matches = matches.sort_values("vote_count", ascending=False)
+        titles = matches["title"].drop_duplicates().head(TITLES_PER_GENRE).tolist()
+        pools[persona_genre] = titles or ["Untitled"]
+    return pools
+
+
+TITLE_POOLS = build_title_pools()
 
 # Expanded extreme hackathon personas with complex behavioral rules
 PROFILES = {
@@ -79,15 +116,16 @@ def generate_logs(events_per_user=500):
             if "skipper" in user_id:
                 action = "content_skipped" if random.random() < 0.8 else random.choice(ACTIONS)
 
+            genre = random.choice(prefs["genres"])
             log = {
                 "timestamp": current_time.isoformat() + "Z",
                 "user_id": user_id,
                 "action_type": action,
                 "metadata": {
                     "app": random.choice(prefs["apps"]),
-                    "genre": random.choice(prefs["genres"]),
+                    "genre": genre,
                     "duration_watched_minutes": random.choice(prefs["durations"]),
-                    "mock_title": fake.catch_phrase(),
+                    "title": random.choice(TITLE_POOLS[genre]),
                     "day_of_week": current_time.strftime('%A')
                 }
             }
