@@ -150,6 +150,13 @@ All three content endpoints accept an optional `content_types` filter
 each tagged with its `content_type` and type-specific fields (e.g. `channel`
 and `start_time` for shows, `league` and `broadcasters` for sport matches).
 
+Profiles in the frontend are these `/api/users` usernames: both profile `id` and
+`name` equal the username. Subsequent frontend API requests carry that username
+as `X-Profile-Id`; recommendation requests requiring `user_id` must also include
+it in their JSON body. There is no separate profiles resource. Development CORS
+allows `http://localhost:5173`, including the profile header. Set frontend
+`VITE_API_URL=http://localhost:8000`; provider credentials stay on the server.
+
 ## Run locally
 
 ```bash

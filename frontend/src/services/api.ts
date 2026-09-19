@@ -1,6 +1,6 @@
 import { useProfileStore } from '../store/profile.store';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const profileId = useProfileStore.getState().activeProfile?.id;
