@@ -1,0 +1,10 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+.hackbarna/
+
+# Generated artifacts (rebuilt by training scripts / database.py)
+*.pkl
+*.db
