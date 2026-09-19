@@ -1,4 +1,4 @@
-import type { KeyboardEventHandler, MouseEventHandler, ReactNode } from 'react';
+import type { FocusEventHandler, KeyboardEventHandler, MouseEventHandler, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 
 interface TVLinkProps {
@@ -11,6 +11,7 @@ interface TVLinkProps {
   focusKey?: string;
   onKeyDown?: KeyboardEventHandler<HTMLAnchorElement>;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
+  onFocus?: FocusEventHandler<HTMLAnchorElement>;
 }
 
 export function TVLink({
@@ -23,6 +24,7 @@ export function TVLink({
   focusKey,
   onKeyDown,
   onClick,
+  onFocus,
 }: TVLinkProps) {
   return (
     <Link
@@ -36,6 +38,7 @@ export function TVLink({
       data-focus-key={focusKey}
       onKeyDown={onKeyDown}
       onClick={onClick}
+      onFocus={onFocus}
     >
       {children}
     </Link>

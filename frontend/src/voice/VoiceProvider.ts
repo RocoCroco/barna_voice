@@ -1,7 +1,9 @@
 import { PipecatClient, type BotOutputData } from '@pipecat-ai/client-js';
 import { SmallWebRTCTransport } from '@pipecat-ai/small-webrtc-transport';
+import { handleRecommendationMessage } from '../services/recommendation-events';
+import { useRecommendationStore } from '../store/recommendation.store';
 import { useVoiceStore } from '../store/voice.store';
-import type { VoiceProvider, VoiceStatus } from '../types/voice';
+import type { VoiceProvider, VoiceSessionContext, VoiceStatus } from '../types/voice';
 
 const defaultAgentUrl = 'http://localhost:7860';
 
@@ -11,8 +13,13 @@ function agentUrl() {
 
 function setVoice(status: VoiceStatus, transcript?: string) {
   const state = useVoiceStore.getState();
+  if (state.status === 'paused' && status !== 'disconnected' && status !== 'paused') return;
   state.setStatus(status);
   if (transcript) state.setTranscript(transcript);
+  if (useRecommendationStore.getState().phase !== 'exploring'
+    && (status === 'listening' || status === 'processing' || status === 'speaking')) {
+    useRecommendationStore.getState().setPhase(status);
+  }
 }
 
 function errorText(value: unknown): string {
@@ -44,6 +51,7 @@ class PipecatVoiceProvider implements VoiceProvider {
   private remoteAudioTrackId: string | null = null;
   private connected = false;
   private listening = false;
+  private sessionId: string | null = null;
 
   private playRemoteAudio(track: MediaStreamTrack) {
     if (!this.remoteAudio) {
@@ -58,7 +66,9 @@ class PipecatVoiceProvider implements VoiceProvider {
 
     this.remoteAudioTrackId = track.id;
     this.remoteAudio.srcObject = new MediaStream([track]);
+    this.remoteAudio.muted = !this.listening;
     void this.remoteAudio.play().catch(() => {
+      if (this.remoteAudioTrackId !== track.id) return;
       setVoice(
         'speaking',
         'Compass is speaking, but browser audio is blocked. Check your TV or browser volume.',
@@ -79,63 +89,90 @@ class PipecatVoiceProvider implements VoiceProvider {
   }
 
   private createClient() {
-    return new PipecatClient({
+    const voice = (status: VoiceStatus, transcript?: string) => {
+      if (this.client === client) setVoice(status, transcript);
+    };
+    const fail = (message: string) => {
+      if (this.client !== client) return;
+      useRecommendationStore.getState().setError(message);
+      voice('disconnected', message);
+      void this.disconnect();
+    };
+    const client = new PipecatClient({
       transport: new SmallWebRTCTransport(),
       enableMic: true,
       enableCam: false,
       callbacks: {
+        onServerMessage: (data: unknown) => {
+          if (this.client === client) handleRecommendationMessage(data);
+        },
         onConnected: () => {
+          if (this.client !== client) return;
           this.connected = true;
         },
         onDisconnected: () => {
+          if (this.client !== client) return;
           this.connected = false;
           this.listening = false;
           this.stopRemoteAudio();
           setVoice('disconnected');
+          useRecommendationStore.getState().setError('Voice session ended. Start a new conversation from Home.');
         },
-        onUserStartedSpeaking: () => setVoice('listening'),
-        onUserStoppedSpeaking: () => setVoice('processing'),
+        onUserStartedSpeaking: () => voice('listening'),
+        onUserStoppedSpeaking: () => voice('processing'),
         onUserTranscript: ({ text, final }) => {
-          if (text.trim()) setVoice(final ? 'processing' : 'listening', text.trim());
+          if (text.trim()) voice(final ? 'processing' : 'listening', text.trim());
         },
-        onBotLlmStarted: () => setVoice('processing', 'Compass is thinking…'),
-        onBotStartedSpeaking: () => setVoice('speaking'),
+        onBotLlmStarted: () => voice('processing', 'Compass is thinking…'),
+        onBotStartedSpeaking: () => voice('speaking'),
         onBotOutput: (data: BotOutputData) => {
-          if (data.text.trim()) setVoice('speaking', data.text.trim());
+          if (data.text.trim()) voice('speaking', data.text.trim());
         },
         onBotStoppedSpeaking: () => {
-          if (this.listening) setVoice('listening', 'Just talk it out…');
+          if (this.listening) voice('listening', 'Just talk it out…');
         },
         onTrackStarted: (track, participant) => {
-          if (track.kind === 'audio' && participant?.local !== true) {
+          if (this.client === client && track.kind === 'audio' && participant?.local !== true) {
             this.playRemoteAudio(track);
           }
         },
         onTrackStopped: (track, participant) => {
-          if (track.kind === 'audio' && participant?.local !== true) {
+          if (this.client === client && track.kind === 'audio' && participant?.local !== true) {
             this.stopRemoteAudio(track);
           }
         },
         onDeviceError: (error) => {
-          setVoice('disconnected', `Microphone unavailable: ${errorText(error)}`);
+          fail(`Microphone unavailable: ${errorText(error)}`);
         },
         onError: (error) => {
-          setVoice('disconnected', errorText(error));
+          fail(errorText(error));
         },
       },
     });
+    return client;
   }
 
-  async connect(): Promise<void> {
-    if (this.connected) return;
-    if (this.connection) return this.connection;
+  async connect(context: VoiceSessionContext): Promise<void> {
+    if (this.sessionId === context.sessionId) {
+      if (this.connection) return this.connection;
+      if (this.connected) return;
+    }
+    if (this.client) await this.disconnect();
 
-    this.client ??= this.createClient();
+    this.sessionId = context.sessionId;
+    this.listening = true;
+    this.client = this.createClient();
+    useVoiceStore.getState().setStatus('processing');
+    useRecommendationStore.getState().setError(null);
     setVoice('processing', 'Connecting to Compass…');
 
     const client = this.client;
     this.connection = (async () => {
       await client.initDevices();
+      if (this.client !== client) {
+        await client.disconnect();
+        return;
+      }
       if (client.mediaState.mic.state !== 'granted') {
         throw new Error(
           'The microphone is busy. Close the other Compass or Pipecat tab, then try again.',
@@ -148,24 +185,29 @@ class PipecatVoiceProvider implements VoiceProvider {
             transport: 'webrtc',
             createDailyRoom: false,
             enableDefaultIceServers: true,
+            body: { ...context },
           },
         });
     })()
       .then(() => {
+        if (this.client !== client) {
+          void client.disconnect().catch(() => {});
+          return;
+        }
         this.connected = true;
-        this.listening = true;
-        setVoice('listening', 'Just talk it out…');
+        client.enableMic(this.listening);
+        if (this.listening) setVoice('listening', 'Just talk it out…');
       })
-      .catch((error: unknown) => {
-        this.stopRemoteAudio();
-        this.client = null;
-        this.connected = false;
-        this.listening = false;
-        setVoice('disconnected', errorText(error));
+      .catch(async (error: unknown) => {
+        if (this.client === client) {
+          await this.disconnect();
+          setVoice('disconnected', errorText(error));
+          useRecommendationStore.getState().setError(errorText(error));
+        }
         throw error;
       })
       .finally(() => {
-        this.connection = null;
+        if (this.client === client) this.connection = null;
       });
 
     return this.connection;
@@ -177,6 +219,7 @@ class PipecatVoiceProvider implements VoiceProvider {
     this.connection = null;
     this.connected = false;
     this.listening = false;
+    this.sessionId = null;
     this.stopRemoteAudio();
     if (client) {
       try {
@@ -185,19 +228,23 @@ class PipecatVoiceProvider implements VoiceProvider {
         // The agent may have already ended the session; local cleanup still succeeds.
       }
     }
-    setVoice('disconnected');
+    if (!this.client) setVoice('disconnected');
   }
 
   async startListening(): Promise<void> {
-    if (!this.connected) await this.connect();
+    if (!this.connected) throw new Error('Start a voice session before resuming.');
     this.client?.enableMic(true);
     this.listening = true;
+    if (this.remoteAudio) this.remoteAudio.muted = false;
+    useVoiceStore.getState().setStatus('listening');
     setVoice('listening');
   }
 
   async stopListening(): Promise<void> {
     this.client?.enableMic(false);
     this.listening = false;
+    if (this.remoteAudio) this.remoteAudio.muted = true;
+    if (this.connected || this.connection) setVoice('paused');
   }
 
   isConnected(): boolean {

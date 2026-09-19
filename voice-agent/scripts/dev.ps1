@@ -25,8 +25,8 @@ try {
         exit $LASTEXITCODE
     }
 
-    Write-Host 'Compass voice client: http://localhost:7860/client/'
-    Write-Host 'Keep SmallWebRTC selected and connect only while actively testing.'
+    Write-Host 'Compass frontend: http://localhost:5173'
+    Write-Host 'Start voice from Compass so profile and session context are supplied.'
     & '.\.venv\Scripts\python.exe' '.\bot.py' `
         --transport webrtc `
         --host localhost `

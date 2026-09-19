@@ -1,4 +1,4 @@
-export type ContentKind = 'movie' | 'series';
+export type ContentKind = 'movie' | 'series' | 'sport';
 
 export type ContentTheme =
   | 'aurora'
@@ -12,7 +12,7 @@ export interface Content {
   id: string;
   title: string;
   kind: ContentKind;
-  year: number;
+  year: number | null;
   duration: string;
   maturityRating: string;
   genres: string[];
@@ -35,4 +35,3 @@ export interface RecommendationRound {
   criteria: string[];
   contentIds: string[];
 }
-

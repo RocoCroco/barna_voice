@@ -13,7 +13,7 @@ La interfaz visible está en inglés. Esta documentación técnica está en espa
 
 ### Implementado
 
-- Selección de perfil con datos simulados.
+- Selección de perfil desde `GET /api/users`; el identificador es el username.
 - Home en dos escenas: voz primero y opciones secundarias debajo.
 - `Room consensus` y `Decide for me` como entradas al flujo de voz.
 - Navegación espacial con flechas, OK, Back y restauración del foco.
@@ -24,17 +24,15 @@ La interfaz visible está en inglés. Esta documentación técnica está en espa
   durante la conversación.
 - Historial de transcripción escalonado bajo la esfera y reubicado al pie al
   mostrar resultados.
-- Cuadrícula animada de ocho recomendaciones simuladas.
+- Cuadrícula animada de hasta ocho recomendaciones reales del backend.
 - Pausa y reanudación desde la esfera lateral.
-- Detalle de contenido accesible desde las recomendaciones simuladas.
+- Detalle de contenido desde la caché de recomendaciones de la sesión.
 - Respeto de `prefers-reduced-motion`.
 
-### Pendiente del backend
+### Pendiente
 
-- Perfiles reales y persistencia de la selección.
+- Persistencia entre recargas del navegador.
 - Catálogo y disponibilidad por proveedor.
-- Recomendaciones reales y razones explicables.
-- Eventos estructurados enviados por el agente para actualizar la cuadrícula.
 - Acción final de reproducción o deep link.
 
 ## Stack
@@ -65,7 +63,7 @@ frontend/
 │   ├── components/            # primitivas reutilizables para TV
 │   ├── navigation/            # foco espacial y eventos del mando
 │   ├── pages/                 # perfiles, Home, sesión y detalle
-│   ├── services/              # frontera con mocks y futuro backend
+│   ├── services/              # API, adaptación de contenido y eventos tipados
 │   ├── store/                 # stores Zustand separados por dominio
 │   ├── styles/                # diseño global y estados visuales
 │   ├── types/                 # contratos compartidos
@@ -83,7 +81,7 @@ Page / Component
       │
       ├──► Zustand store ─────────► estado visible
       │
-      ├──► service ───────────────► mock actual / backend futuro
+      ├──► service ───────────────► backend / caché de sesión
       │
       └──► useVoiceAgent
                 │
@@ -158,16 +156,20 @@ navegador permite continuar desarrollando sin el dispositivo.
 
 ## Recomendaciones y animación
 
-Las recomendaciones actuales proceden de `recommendations.service.ts` y no del
-LLM. Esta separación es intencionada: permite demostrar la experiencia visual
-sin atribuir disponibilidad ni resultados falsos al agente.
+Los modos se mapean a `discover → preference`, `consensus → room` y
+`decide → decide` bajo `/api/content/`. `content.service.ts` adapta las
+respuestas reales y conserva los detalles en una caché por sesión.
+No existe un endpoint de detalle: recargar el navegador pierde esta caché.
 
-Cuando llegue el backend, un evento estructurado podrá incluir:
+El agente envía el evento por `onServerMessage` de Pipecat, sin interpretar
+transcripciones:
 
 ```ts
 interface RecommendationUpdate {
+  type: 'recommendations.updated';
   sessionId: string;
   profileId: string;
+  revision: number;
   message: string;
   criteria: string[];
   items: Array<{
@@ -175,26 +177,18 @@ interface RecommendationUpdate {
     score: number;
     reason?: string;
   }>;
+  catalog: BackendItem[];
 }
 ```
 
-La UI conservará las tarjetas que siguen siendo válidas y animará únicamente
-las entradas, salidas y cambios de posición. La conversación WebRTC permanecerá
-abierta durante estas actualizaciones.
+`catalog` contiene los datos originales necesarios para resolver cada `contentId`;
+`revision` descarta actualizaciones duplicadas o antiguas. También se valida el
+perfil y la sesión antes de modificar la caché.
 
-## Estados temporales para la demo
-
-Mientras las recomendaciones no estén conectadas al agente, la ruta
-`/recommendations` incluye atajos de desarrollo:
-
-- `1`: listening;
-- `2`: transcripción;
-- `3`: pregunta del agente;
-- `4`: llegada escalonada de resultados;
-- `5`: refinamiento y reordenación.
-
-Estos atajos demuestran la coreografía visual; no deben presentarse como datos
-reales ni mantenerse en la versión final.
+La UI conserva las tarjetas que siguen siendo válidas y anima entradas, salidas
+y cambios de posición. La conversación WebRTC permanece abierta. Pausar silencia
+micrófono y altavoz, y abrir el detalle conserva la lista y el foco para volver.
+La selección persiste entre refinamientos. Salir a Home o perfiles cierra la sesión.
 
 ## Comandos
 
@@ -202,6 +196,7 @@ reales ni mantenerse en la versión final.
 cd frontend
 pnpm install
 pnpm run typecheck
+pnpm run test
 pnpm run build
 pnpm dev
 ```

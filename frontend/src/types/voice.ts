@@ -1,3 +1,11 @@
+import type { RecommendationMode } from './content';
+
+export interface VoiceSessionContext {
+  sessionId: string;
+  profileId: string;
+  mode: RecommendationMode;
+}
+
 export type VoiceStatus =
   | 'disconnected'
   | 'ready'
@@ -7,11 +15,10 @@ export type VoiceStatus =
   | 'paused';
 
 export interface VoiceProvider {
-  connect(): Promise<void>;
+  connect(context: VoiceSessionContext): Promise<void>;
   disconnect(): Promise<void>;
   startListening(): Promise<void>;
   stopListening(): Promise<void>;
   isConnected(): boolean;
   isListening(): boolean;
 }
-

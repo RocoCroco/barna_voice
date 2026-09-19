@@ -3,15 +3,28 @@ import { ArrowRight, ChevronsDown, Mic, Sparkles, UsersRound } from 'lucide-reac
 import { ContentCard } from '../../components/ContentCard';
 import { TVLink } from '../../components/TVLink';
 import { contentService } from '../../services/content.service';
-import { voiceProvider } from '../../voice/VoiceProvider';
+import { useProfileStore } from '../../store/profile.store';
+import type { Content } from '../../types/content';
 
 export function HomePage() {
-  const featured = contentService.getFeatured();
+  const [featured, setFeatured] = useState<Content[]>([]);
+  const [catalogueError, setCatalogueError] = useState('');
+  const profileId = useProfileStore((state) => state.activeProfile?.id);
   const [activeScene, setActiveScene] = useState<'hero' | 'browse'>('hero');
 
   useEffect(() => {
-    if (voiceProvider.isConnected()) void voiceProvider.disconnect();
-  }, []);
+    if (!profileId) return;
+    let cancelled = false;
+    contentService.setScope(`home:${profileId}`);
+    setCatalogueError('');
+    setFeatured([]);
+    void contentService.getFeatured(profileId).then((items) => {
+      if (!cancelled) setFeatured(items);
+    }).catch(() => {
+      if (!cancelled) setCatalogueError('Could not load the catalogue. Please try again later.');
+    });
+    return () => { cancelled = true; };
+  }, [profileId]);
 
   const lockSpatialNavigation = () => {
     document.body.dataset.tvNavigationLocked = 'true';
@@ -49,7 +62,6 @@ export function HomePage() {
             className="voice-circle"
             defaultFocus
             voiceTrigger
-            onClick={() => void voiceProvider.connect()}
             onKeyDown={(event) => {
               if (event.key === 'ArrowDown') {
                 event.preventDefault();
@@ -77,7 +89,6 @@ export function HomePage() {
           <TVLink
             to="/recommendations?mode=consensus"
             className="mode-card mode-card--consensus"
-            onClick={() => void voiceProvider.connect()}
             onKeyDown={(event) => {
               if (event.key === 'ArrowUp') {
                 event.preventDefault();
@@ -101,7 +112,6 @@ export function HomePage() {
           <TVLink
             to="/recommendations?mode=decide"
             className="mode-card mode-card--decide"
-            onClick={() => void voiceProvider.connect()}
             onKeyDown={(event) => {
               if (event.key === 'ArrowUp') {
                 event.preventDefault();
@@ -132,6 +142,7 @@ export function HomePage() {
               <ContentCard key={content.id} content={content} />
             ))}
           </div>
+          {catalogueError && <p role="alert">{catalogueError}</p>}
         </section>
       </section>
       </div>

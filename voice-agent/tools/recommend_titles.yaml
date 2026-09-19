@@ -1,0 +1,42 @@
+description: Get eight real catalogue recommendations for the active profile and mode. Use only preferences the viewers stated.
+input:
+  type: object
+  properties:
+    profile_id:
+      type: string
+      description: Exact active profile ID from the session context.
+    session_preferences:
+      type: object
+      properties:
+        genre:
+          type: string
+        duration:
+          type: integer
+          description: Maximum runtime in minutes.
+        mood:
+          type: string
+        content_types:
+          type: array
+          items:
+            type: string
+            enum: [movie, show, sport]
+        participants:
+          type: array
+          description: Anonymous viewers' independent preferences in consensus mode.
+          items:
+            type: object
+            properties:
+              genre:
+                type: string
+              duration:
+                type: integer
+              mood:
+                type: string
+            additionalProperties: false
+      additionalProperties: false
+  required: [profile_id, session_preferences]
+  additionalProperties: false
+local:
+  handler: tools/recommendations.py
+interruption: provider_default
+effect: returns_data

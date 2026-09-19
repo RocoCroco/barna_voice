@@ -1,0 +1,42 @@
+description: Update the current recommendations when constraints change. Omitted preferences persist; null clears a preference. No new voice connection is needed.
+input:
+  type: object
+  properties:
+    session_id:
+      type: string
+      description: Exact current session ID from session context or the previous tool result.
+    changes:
+      type: object
+      properties:
+        genre:
+          type: [string, "null"]
+        duration:
+          type: [integer, "null"]
+          description: Maximum runtime in minutes.
+        mood:
+          type: [string, "null"]
+        content_types:
+          type: [array, "null"]
+          items:
+            type: string
+            enum: [movie, show, sport]
+        participants:
+          type: [array, "null"]
+          description: The complete updated list of anonymous viewers' preferences.
+          items:
+            type: object
+            properties:
+              genre:
+                type: [string, "null"]
+              duration:
+                type: [integer, "null"]
+              mood:
+                type: [string, "null"]
+            additionalProperties: false
+      additionalProperties: false
+  required: [session_id, changes]
+  additionalProperties: false
+local:
+  handler: tools/recommendations.py
+interruption: provider_default
+effect: returns_data
