@@ -6,9 +6,10 @@ viewer describes the mood, occasion and constraints out loud. Compass holds a
 short conversation and will progressively turn that context into a small,
 understandable set of recommendations.
 
-This repository contains the TV frontend and the independently deployable voice
-agent. The product backend is intentionally outside the current implementation
-and will later provide profiles, catalogue availability and recommendation data.
+This repository contains the TV frontend, the independently deployable voice
+agent, and a FastAPI backend prototype. The backend already serves a unified
+content catalogue (movies, TV schedule and live football), activity logs and
+ML-based recommendations; it is not yet wired into the frontend or voice agent.
 
 ## Current status
 
@@ -19,7 +20,8 @@ and will later provide profiles, catalogue availability and recommendation data.
 | Profile selection | Simulated | Service boundary is ready for the backend |
 | Voice conversation | Working | Real microphone, STT, LLM, TTS and speaker output |
 | Recommendation UI | Working simulation | Mock catalogue and animated refinement rounds |
-| Voice-driven recommendations | Pending backend | Agent tools and recommendation events are the next integration |
+| Backend API | Working prototype | FastAPI service with catalogue, logs and ML recommendations, not yet integrated |
+| Voice-driven recommendations | Pending integration | Agent tools and recommendation events still need to call the backend |
 | Titan OS device validation | Pending | The browser currently simulates the TV environment |
 
 ## Architecture
@@ -168,20 +170,24 @@ Open `http://localhost:5173`. Allow microphone access when prompted.
 ## Documentation
 
 - [Frontend architecture](./FRONTEND.md)
+- [Backend architecture](./BACKEND.md)
 - [Product flow and voice UX](./PRODUCT_FLOW.md)
 - [Voice-agent architecture](./voice-agent/README.md)
 - [Challenge demo guide](./DEMO_GUIDE.md)
 
 ## Next backend integration
 
-The frontend and voice layers are ready to receive a backend contract for:
+The backend (see [BACKEND.md](./BACKEND.md)) already implements catalogue,
+logging and recommendation endpoints. The frontend and voice layers still need
+to be wired up to it for:
 
-1. `GET /profiles` and active-profile selection;
+1. `GET /profiles` and active-profile selection (not yet in the backend);
 2. catalogue search constrained by real availability;
-3. recommendation and refinement tools called by the voice agent;
+3. recommendation and refinement tools called by the voice agent, via the
+   existing `/api/content/*` and `/api/tool/*` endpoints;
 4. structured events that update the visible grid without ending the voice
    session;
 5. content detail and playback/deep-link actions.
 
-Until that contract exists, profiles, catalogue content and recommendation
-rounds remain deliberately labelled simulations.
+Until that wiring exists, profiles, catalogue content and recommendation
+rounds in the frontend remain deliberately labelled simulations.
