@@ -1,0 +1,63 @@
+version: 1
+name: compass-voice
+entry_agent: compass
+
+agents:
+  compass:
+    instructions: instructions.md
+    think: compass_brain
+    speak: compass_voice
+    tools:
+      - end_call
+
+secrets:
+  - NEBIUS_API_KEY
+  - NEBIUS_BASE_URL
+  - SLNG_API_KEY
+
+models:
+  think:
+    compass_brain:
+      description: Nebius Token Factory conversational model
+      provider: nebius
+      model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+      endpoint_env: NEBIUS_BASE_URL
+      temperature: 0.3
+  speak:
+    compass_voice:
+      description: Compass English voice
+      provider: slng
+      model: "deepgram/aura:2"
+      voice: "aura-2-thalia-en"
+      language: en
+      params:
+        world_part: eu-west
+  listen:
+    compass_listener:
+      provider: slng
+      model: "deepgram/nova:3"
+      language: en
+      params:
+        world_part: eu-west
+  turn:
+    compass_turn:
+      provider: local
+      model: silero
+      pace: balanced
+
+tools:
+  - end_call
+
+conversation:
+  greeting:
+    speaks_first: agent
+    text: "Hi, I'm Compass. What are you in the mood to watch?"
+
+channels:
+  web:
+    kind: realtime_audio
+
+capacity:
+  peak_sessions: 2
+  max_sessions: 5
+  avg_session_duration: 10m

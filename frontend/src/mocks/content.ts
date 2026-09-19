@@ -1,0 +1,108 @@
+import type { Content } from '../types/content';
+
+export const MOCK_CONTENT: Content[] = [
+  {
+    id: 'afterlight',
+    title: 'Afterlight',
+    kind: 'movie',
+    year: 2025,
+    duration: '1 h 42 min',
+    maturityRating: '12+',
+    genres: ['Drama', 'Science fiction'],
+    synopsis:
+      'An engineer discovers an impossible signal during the final night of a coastal observatory.',
+    recommendationReason: 'Emotional, mature and mysterious without becoming violent.',
+    theme: 'aurora',
+  },
+  {
+    id: 'northern-line',
+    title: 'Northern Line',
+    kind: 'movie',
+    year: 2024,
+    duration: '1 h 36 min',
+    maturityRating: '12+',
+    genres: ['Action', 'Thriller'],
+    synopsis:
+      'Two strangers cross a city at a standstill to catch the final train of the night.',
+    recommendationReason: 'The fastest-paced option, with light tension and a compact runtime.',
+    theme: 'ember',
+  },
+  {
+    id: 'soft-landing',
+    title: 'Soft Landing',
+    kind: 'movie',
+    year: 2023,
+    duration: '1 h 48 min',
+    maturityRating: '7+',
+    genres: ['Comedy', 'Adventure'],
+    synopsis:
+      'A family turns a disastrous road trip into the escape they have needed for years.',
+    recommendationReason: 'The lightest option and an easy choice to share in the living room.',
+    theme: 'sand',
+  },
+  {
+    id: 'velvet-code',
+    title: 'Velvet Code',
+    kind: 'series',
+    year: 2025,
+    duration: '6 episodes',
+    maturityRating: '16+',
+    genres: ['Mystery', 'Drama'],
+    synopsis:
+      'A restorer finds hidden messages woven into the fabrics of a private collection.',
+    recommendationReason: 'An elegant, unexpected choice for viewers who want a mystery.',
+    theme: 'orchid',
+  },
+  {
+    id: 'quiet-current',
+    title: 'Quiet Current',
+    kind: 'movie',
+    year: 2022,
+    duration: '1 h 31 min',
+    maturityRating: '7+',
+    genres: ['Drama', 'Comedy'],
+    synopsis:
+      'Three neighbours try to save the floating cinema where they met twenty years ago.',
+    recommendationReason: 'Short, warm and optimistic, with a gentle sense of humour.',
+    theme: 'ocean',
+  },
+  {
+    id: 'orbit-house',
+    title: 'Orbit House',
+    kind: 'movie',
+    year: 2024,
+    duration: '1 h 54 min',
+    maturityRating: '12+',
+    genres: ['Science fiction', 'Comedy'],
+    synopsis:
+      'The residents of an apartment block discover that their building is a prototype spacecraft.',
+    recommendationReason: 'A balanced mix of science fiction, comedy and group-friendly adventure.',
+    theme: 'forest',
+  },
+  {
+    id: 'red-harbour',
+    title: 'Red Harbour',
+    kind: 'series',
+    year: 2025,
+    duration: '8 episodes',
+    maturityRating: '16+',
+    genres: ['Thriller', 'Crime'],
+    synopsis:
+      'A detective returns to the island where she grew up to investigate a recent disappearance.',
+    recommendationReason: 'For a more intense session with several episodes ahead.',
+    theme: 'ember',
+  },
+  {
+    id: 'small-wonders',
+    title: 'Small Wonders',
+    kind: 'series',
+    year: 2023,
+    duration: '5 episodes',
+    maturityRating: 'All',
+    genres: ['Documentary', 'Nature'],
+    synopsis:
+      'Extraordinary stories filmed from the perspective of the smallest animals.',
+    recommendationReason: 'A beautiful, relaxing option that works at any time.',
+    theme: 'forest',
+  },
+];
