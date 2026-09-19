@@ -7,3 +7,4 @@ scikit-learn
 pandas
 joblib
 pytest
+httpx==0.28.1

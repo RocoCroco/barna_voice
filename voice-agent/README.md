@@ -2,7 +2,7 @@
 
 `voice-agent/` is the independent real-time conversation layer for Compass. It
 does not own user data, profiles or catalogue records. Its role is to listen,
-reason, speak and, once the product backend is available, call typed tools that
+reason, speak and call typed tools that
 request recommendations.
 
 The current milestone is fully operational spoken conversation:
@@ -17,9 +17,9 @@ browser microphone
   → browser / TV speaker
 ```
 
-Catalogue lookup and structured recommendation tools are intentionally pending.
-The agent may discuss well-known titles, but its prompt forbids inventing
-availability, prices or personal history.
+Recommendation tools call the existing backend and push structured catalogue
+results to the board. Details resolve only from the active session's cache.
+The prompt forbids inventing availability, prices or personal history.
 
 ## Why each platform is used
 
@@ -61,9 +61,7 @@ The LLM interprets mood and constraints, decides whether a question materially
 improves the recommendation and writes the short response sent to TTS. The
 current temperature is `0.3` for stable, concise conversation.
 
-When backend tools arrive, Nebius will remain the orchestrating intelligence. It
-will turn the conversation into structured calls rather than being included as
-an unrelated sponsor integration.
+Nebius turns the conversation into structured recommendation and refinement calls.
 
 ### Pipecat and SmallWebRTC
 
@@ -87,17 +85,25 @@ voice-agent/
 ├── instructions.md            # identity, voice contract and guardrails
 ├── targets.yaml               # Pipecat target
 ├── tools/
-│   └── end_call.yaml          # explicit conversational end tool
+│   ├── end_call.yaml          # explicit conversational end tool
+│   ├── recommend_titles.yaml
+│   ├── refine_recommendations.yaml
+│   ├── get_content_details.yaml
+│   └── recommendations.py     # scoped backend calls and session cache
 ├── runtime/
-│   └── slng_stt_batched.py    # SLNG audio-message batching adapter
+│   ├── slng_stt_batched.py     # SLNG audio-message batching adapter
+│   └── compass_session.py     # request context, tool schemas and RTVI events
 ├── scripts/
 │   ├── common.ps1             # safe local environment loading
 │   ├── dev.ps1                # compile, patch dependencies and start
 │   ├── patch-generated.ps1    # installs the batching adapter after compile
+│   ├── patch_generated.py     # shared runtime installation for all platforms
 │   ├── validate.ps1           # validate and compile
 │   ├── list-nebius-models.ps1 # read-only model availability check
 │   └── test-nebius.ps1        # minimal LLM connectivity test
 ├── .env.example               # variable names only
+├── run.py                     # cross-platform compile, patch and startup
+├── tests/                     # tools, isolation and runtime contract checks
 └── build/                     # generated, disposable and ignored
 ```
 
@@ -157,6 +163,7 @@ Set:
 NEBIUS_API_KEY=
 NEBIUS_BASE_URL=https://api.tokenfactory.nebius.com/v1/
 SLNG_API_KEY=
+BACKEND_URL=http://localhost:8000
 ```
 
 Rules:
@@ -168,9 +175,20 @@ Rules:
 
 ## Validate and run
 
-The helper scripts expect repository-local Unmute and uv executables under
-`.tools/`. They are already prepared in the development workspace and ignored by
-Git.
+Use Unmute **0.4.2**, Pipecat **1.8.0** (pinned in `targets.yaml`), uv and
+Python 3.12. On Linux/macOS, put `unmute` and `uv` on PATH:
+
+```sh
+python voice-agent/run.py --compile-only
+python voice-agent/run.py
+```
+
+The wrapper installs dependencies into `voice-agent/.venv`, outside the disposable
+build directory. It installs both the SLNG adapter and the session bridge.
+Generated tool schemas retain the nested YAML preference fields.
+
+On Windows the PowerShell scripts expect repository-local executables at
+`.tools/unmute/unmute.exe` and `.tools/uv/uv.exe` (ignored by Git).
 
 From the repository root:
 
@@ -186,9 +204,10 @@ From the repository root:
 .\voice-agent\scripts\dev.ps1
 ```
 
-The runtime listens on `http://localhost:7860`. The Pipecat playground remains
-available at `/client/` for low-level diagnostics, but the Compass frontend is
-the product client.
+The runtime listens on `http://localhost:7860`. Use the Compass frontend:
+the agent requires its session context, which the stock Pipecat playground does
+not supply. `POST /start` receives `requestData.body` containing
+`{ sessionId, profileId, mode }`; the runner forwards it as `runner_args.body`.
 
 Press `Ctrl+C` in the agent terminal to stop the server. In the product UI,
 pressing the large orb ends an active pre-results conversation. With results on
@@ -209,30 +228,68 @@ The custom frontend maps Pipecat callbacks into product state:
 | bot stopped speaking | return to listening |
 | disconnected/error | clean local media and display a safe state |
 
-The next contract should add a structured `recommendations.updated` event rather
-than parsing spoken text. That event will carry content IDs, criteria, scores and
-optional reasons while the WebRTC conversation remains open.
+After a successful recommendation call, the bridge sends an RTVI
+`{ label: "rtvi-ai", type: "server-message", data: event }` transport frame.
+The frontend receives `event` in `onServerMessage`:
+
+```ts
+{
+  type: 'recommendations.updated',
+  sessionId: string,
+  profileId: string, // backend username
+  revision: number,
+  message: string,
+  criteria: string[],
+  items: { contentId: string, score: number, reason?: string }[],
+  catalog: BackendItem[]
+}
+```
+
+`catalog` carries the exact backend items for the shared frontend adapter and
+session-cached details. IDs serialize `[content_type, title, release_year or
+air_date or match_date, channel, start_time or kickoff_cet]` as compact JSON.
+Scores are reciprocal ranks, not probabilities. Revisions increase per session.
+Failures emit `recommendations.error` with `sessionId`, `profileId` and `message`;
+the previous board remains available.
 
 ## Backend integration boundary
 
-The agent will eventually receive tools similar to:
+Registered tools:
 
 ```text
-get_profile_context(profile_id)
-search_catalogue(profile_id, constraints)
 recommend_titles(profile_id, session_preferences)
 refine_recommendations(session_id, changes)
 get_content_details(content_id)
 ```
 
-The product backend remains authoritative for profiles, catalogue availability
-and recommendation records. The agent should send structured intent and narrate
-results, not duplicate backend data ownership.
+The product backend remains authoritative for profiles and catalogue items.
+`discover` calls `/api/content/preference`, `consensus` calls `/api/content/room`,
+and `decide` calls `/api/content/decide`. Every request sends the active username
+as `X-Profile-Id`; decide and the default room participant also send `user_id`.
+Other room participants can have anonymous preferences, never invented usernames.
+Decide supports history and content-type filtering; genre/runtime/mood constraints
+require Discover. Refinements merge changed fields; explicit null clears a field.
+No backend routes were added for catalogue or details.
+
+Tool state is scoped to the running connection through a `ContextVar` and cleared
+when the pipeline exits. Pausing and entering details keep this connection alive.
+Refresh, disconnect or a new profile starts a new context.
+
+## Checks
+
+After compilation and dependency installation, from `voice-agent/` on Linux/macOS:
+
+```sh
+PYTHONPATH=build/pipecat .venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m ty check tools/recommendations.py runtime/compass_session.py scripts/patch_generated.py run.py
+```
+
+Live speech validation additionally requires configured SLNG and Nebius credentials,
+the backend on port 8000 and the frontend on port 5173.
 
 ## Current limitations
 
-- No real catalogue or profile API is connected.
-- Recommendation cards are not yet triggered by agent tool output.
+- Cached details are lost when the session ends or the browser reloads.
 - The browser and voice runtime run locally for the MVP.
 - Titan OS device audio, permissions and lifecycle still require validation.
 - Challenge latency and cost numbers have not yet been measured systematically;

@@ -325,30 +325,26 @@ button:disabled {
   transition: opacity 220ms ease, transform 220ms ease;
 }
 
-.voice-demo-shortcuts {
+.session-end,
+.session-end:focus,
+.session-error {
   position: absolute;
   z-index: 12;
   top: clamp(29px, 4.3vh, 54px);
   right: clamp(28px, 3.5vw, 66px);
-  display: flex;
-  align-items: center;
-  gap: 13px;
-  color: rgba(227, 235, 248, 0.5);
-  font-size: clamp(9px, 0.72vw, 12px);
+  color: #e3ebf8;
+  font-size: clamp(12px, 1vw, 18px);
 }
 
-.voice-demo-shortcuts > span:first-child {
-  color: rgba(227, 235, 248, 0.3);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+.session-error {
+  top: auto;
+  bottom: 50px;
+  max-width: 60%;
+  color: #ffcab5;
 }
 
-.voice-demo-shortcuts kbd {
-  display: inline-grid;
-  width: 21px;
-  height: 21px;
-  place-items: center;
-  margin-right: 3px;
+.session-end {
+  padding: 12px 18px;
   border: 1px solid rgba(140, 236, 255, 0.28);
   border-radius: 6px;
   color: #bcefff;
@@ -435,9 +431,7 @@ button:disabled {
   z-index: 3;
   inset: -9%;
   transform-origin: 50% 50%;
-  animation: compass-search 3.2s ease-in-out infinite !important;
-  animation-duration: 3.2s !important;
-  animation-iteration-count: infinite !important;
+  animation: compass-search 3.2s ease-in-out infinite;
   pointer-events: none;
 }
 
@@ -626,31 +620,6 @@ button:disabled {
 .live-recommendation-item {
   min-width: 0;
   will-change: transform, opacity;
-  animation-duration: 520ms !important;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1) !important;
-  animation-fill-mode: both;
-}
-
-.live-recommendation-item--even {
-  animation-name: recommendation-rise-even;
-}
-
-.live-recommendation-item--odd {
-  animation-name: recommendation-rise-odd;
-}
-
-@keyframes recommendation-rise-even {
-  from {
-    transform: translateY(52px) scale(0.955);
-    opacity: 0;
-  }
-}
-
-@keyframes recommendation-rise-odd {
-  from {
-    transform: translateY(52px) scale(0.955);
-    opacity: 0;
-  }
 }
 
 .live-recommendation-grid .content-card {
@@ -1728,7 +1697,4 @@ kbd {
     transition-duration: 0.01ms !important;
   }
 
-  .home-scenes {
-    transition-duration: 420ms !important;
-  }
 }

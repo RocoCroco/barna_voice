@@ -1,4 +1,4 @@
-import database
+from db import database
 
 
 def test_distinct_users_present():

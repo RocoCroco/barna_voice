@@ -1,5 +1,6 @@
 # models/predict_genre.py
 import sqlite3
+from pathlib import Path
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
@@ -7,7 +8,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 import joblib
 
-DB_NAME = "tv_logs.db"
+MODELS_DIR = Path(__file__).resolve().parent
+DB_NAME = str(MODELS_DIR.parent / "db" / "tv_logs.db")
 
 
 def train_and_validate():
@@ -63,10 +65,10 @@ def train_and_validate():
     print(f"-> Validation Accuracy: {accuracy * 100:.2f}%\n")
 
     print("6. Exporting model and encoders...")
-    joblib.dump(model, "predict_genre_model.pkl")
-    joblib.dump(user_encoder, "predict_genre_user_encoder.pkl")
-    joblib.dump(app_encoder, "predict_genre_app_encoder.pkl")
-    joblib.dump(day_encoder, "predict_genre_day_encoder.pkl")
+    joblib.dump(model, MODELS_DIR / "predict_genre_model.pkl")
+    joblib.dump(user_encoder, MODELS_DIR / "predict_genre_user_encoder.pkl")
+    joblib.dump(app_encoder, MODELS_DIR / "predict_genre_app_encoder.pkl")
+    joblib.dump(day_encoder, MODELS_DIR / "predict_genre_day_encoder.pkl")
     print("Done! Model saved as 'predict_genre_model.pkl'.")
 
 

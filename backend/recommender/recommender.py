@@ -16,10 +16,10 @@ from typing import Optional
 
 import pandas as pd
 
-import database
+from db import database
 
-BASE_DIR = Path(__file__).resolve().parent
-MOVIE_CSV = "/home/inv00606/Desktop/TMDB_movie_dataset_v11.csv"
+BASE_DIR = Path(__file__).resolve().parents[1] / "data"
+MOVIE_CSV = str(BASE_DIR / "movie_dataset.csv")
 TV_SCHEDULE_CSV = str(BASE_DIR / "tv_schedule.csv")
 MATCHDAY_CSV = str(BASE_DIR / "matchday.csv")
 

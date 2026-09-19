@@ -7,3 +7,5 @@
 # `unmute compile` output. Regenerated from the files beside it, so there is
 # nothing here worth keeping in history.
 build/
+.venv/
+__pycache__/

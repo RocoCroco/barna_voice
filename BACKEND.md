@@ -20,26 +20,30 @@ voice agent and frontend will call it over HTTP once the integration lands.
 
 ```text
 backend/
-  main.py                  FastAPI app: all HTTP endpoints
-  database.py              SQLite access layer (tv_logs.db)
-  recommender.py           Catalog loading, filtering and ranking logic
-  seed_db.py               Loads tv_logs.json into the SQLite database
-  data_generation.py       Generates mock activity logs / datasets
-  data_generation-1.py     Alternate/experimental mock data generator
-  train_model-old.py       Superseded single-file training script
-  dataset_model.ipynb      Notebook used to explore the datasets/models
-  movie_dataset.csv        Sample movie catalog data
-  tv_schedule.csv          TV channel programming schedule
-  matchday.csv             Live football fixtures
-  tv_logs.json             Mock activity log seed data
+  app/
+    main.py                FastAPI routes and startup/model loading
+  db/
+    database.py            SQLite access layer
+    seed_db.py             Loads the activity seed into SQLite
+    tv_logs.db             Generated database (ignored by Git)
+  recommender/
+    recommender.py         Catalog loading, filtering and ranking logic
+  data/
+    data_generation.py     Generates mock activity logs / datasets
+    movie_dataset.csv      Sample movie catalog data
+    tv_schedule.csv        TV channel programming schedule
+    matchday.csv           Live football fixtures
+    tv_logs.json           Mock activity log seed data
   requirements.txt         Python dependencies
+  pytest.ini               Discovers automated tests under tests/
   models/
     train_models.py        Runs every model-training script in this folder
     predict_genre.py        Trains the genre-prediction model
     predict_movie.py        Trains the movie-prediction model
     predict_user_preference.py  Trains the context-only preference model
     README.md               One-line description of each of the 3 models
-    test_models_mock.py      Mock/manual test for the trained models
+    test_models_mock.py      Standalone mock inference check (not a pytest suite)
+    *.pkl                   Generated model/encoder bundles (ignored by Git)
   tests/
     conftest.py
     test_api.py             Endpoint tests (FastAPI TestClient)
@@ -49,7 +53,7 @@ backend/
 
 ## Data model
 
-`database.py` manages a single SQLite database, `tv_logs.db`, with one table:
+`db/database.py` manages a single SQLite database, `db/tv_logs.db`, with one table:
 
 ```sql
 activity_logs (
@@ -62,34 +66,33 @@ activity_logs (
 ```
 
 An index on `(user_id, timestamp DESC)` keeps per-user history lookups fast for
-the LLM/recommendation context. `seed_db.py` loads the mock events in
-`tv_logs.json` into this table for local development.
+the LLM/recommendation context. `db/seed_db.py` loads the mock events in
+`data/tv_logs.json` into this table for local development.
 
 ## Catalog
 
-`recommender.py` builds one unified catalog `DataFrame` (cached with
+`recommender/recommender.py` builds one unified catalog `DataFrame` (cached with
 `lru_cache`) by normalizing three sources into a common shape
 (`content_type`, `title`, `genres`, `runtime`, `rank_score`, `search_text`,
 plus type-specific fields):
 
 | Source | File | `content_type` | Ranking |
 | --- | --- | --- | --- |
-| Movies | TMDB CSV (`MOVIE_CSV` path) | `movie` | `vote_count` |
-| TV shows | `tv_schedule.csv` | `show` | fixed high score (always near top) |
-| Football | `matchday.csv` | `sport` | fixed highest score (always top) |
+| Movies | `data/movie_dataset.csv` | `movie` | `vote_count` |
+| TV shows | `data/tv_schedule.csv` | `show` | fixed high score (always near top) |
+| Football | `data/matchday.csv` | `sport` | fixed highest score (always top) |
 
 Genre and mood are mapped to catalog terms via `GENRE_MAP` and `MOOD_TERMS`,
 so persona/log genres (e.g. `Sci-Fi`, `Indie`) and free-text moods (e.g.
 `cozy`, `intense`) resolve to actual catalog genres or search keywords.
 
-> Note: `MOVIE_CSV` in `recommender.py` currently points to an absolute local
-> path (`/home/inv00606/Desktop/TMDB_movie_dataset_v11.csv`) rather than the
-> repository's `movie_dataset.csv`. Update this path for other machines.
+Data, database and model paths resolve from their source files, independently of
+the working directory. The catalogue uses the movie dataset shipped in this repo.
 
 ## ML models
 
 Three scikit-learn classifiers live in `backend/models/`, trained from
-`tv_logs.db` history and loaded by `main.py` at startup (see
+`db/tv_logs.db` history and loaded by `app/main.py` at startup (see
 [models/README.md](./backend/models/README.md)):
 
 | Model | Predicts | Inputs |
@@ -105,15 +108,16 @@ categorical inputs). Train (or retrain) all of them with:
 python backend/models/train_models.py
 ```
 
-This runs every training script in `models/` against the repository root (so
-they can read `tv_logs.db`). If a `.pkl` file is missing, `main.py` logs a
+This runs every training script in `models/`, reading `db/tv_logs.db` and writing
+the classifier and encoder bundles to `models/`. If a `.pkl` file is missing,
+`app/main.py` logs a
 warning at startup and the corresponding endpoints return `503`. Unseen
 users/genres/apps fall back to a `cold_start` response recommending the
 `Action` genre.
 
 ## API
 
-`main.py` exposes:
+`app/main.py` exposes:
 
 **Meta / data**
 - `GET /` — service info and loaded models.
@@ -146,23 +150,39 @@ All three content endpoints accept an optional `content_types` filter
 each tagged with its `content_type` and type-specific fields (e.g. `channel`
 and `start_time` for shows, `league` and `broadcasters` for sport matches).
 
+Profiles in the frontend are these `/api/users` usernames: both profile `id` and
+`name` equal the username. Subsequent frontend API requests carry that username
+as `X-Profile-Id`; recommendation requests requiring `user_id` must also include
+it in their JSON body. There is no separate profiles resource. Development CORS
+allows `http://localhost:5173`, including the profile header. Set frontend
+`VITE_API_URL=http://localhost:8000`; provider credentials stay on the server.
+
 ## Run locally
 
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python seed_db.py                 # optional: load mock activity logs
+python -m db.database             # initialize and import seed with original timestamps
 python models/train_models.py     # optional: train the ML models
-uvicorn main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 ```
 
 ## Tests
 
 ```bash
 cd backend
+python -m db.database             # once on a fresh checkout, before training
+python models/train_models.py
 pytest
+python models/test_models_mock.py # standalone inference check
 ```
+
+Import the seed only once per database; repeating it inserts duplicate events.
+`python -m db.seed_db` is the alternative seed command that assigns current
+timestamps, retaining its previous behaviour. Automated tests expect a seeded
+database and trained models. Pytest discovery excludes the standalone manual
+inference script in `models/`.
 
 `tests/test_api.py`, `tests/test_database.py` and `tests/test_recommender.py`
 cover the HTTP endpoints, the SQLite access layer and the catalog/ranking

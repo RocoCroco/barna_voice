@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from 'motion/react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { VoiceSessionBackground } from '../../components/backgrounds/VoiceSessionBackground';
 import { ContentCard } from '../../components/ContentCard';
 import { focusManager } from '../../navigation/FocusManager';
+import { useReducedMotion } from '../../navigation/useReducedMotion';
 import { contentService } from '../../services/content.service';
 import { useProfileStore } from '../../store/profile.store';
 import { useRecommendationStore } from '../../store/recommendation.store';
@@ -12,7 +13,6 @@ import { useVoiceAgent } from '../../voice/useVoiceAgent';
 
 const validModes: RecommendationMode[] = ['discover', 'consensus', 'decide'];
 
-type DemoState = 'listening' | 'transcript' | 'question' | 'processing' | 'recommendations';
 type TranscriptRole = 'you' | 'compass';
 
 interface TranscriptEntry {
@@ -20,23 +20,6 @@ interface TranscriptEntry {
   role: TranscriptRole;
   text: string;
 }
-
-const stateCopy: Record<Exclude<DemoState, 'recommendations'>, {
-  caption: string;
-}> = {
-  listening: {
-    caption: 'Just talk it out…',
-  },
-  transcript: {
-    caption: 'Something clever and exciting, but not too intense.',
-  },
-  question: {
-    caption: 'Are you watching alone or with someone tonight?',
-  },
-  processing: {
-    caption: 'Shaping recommendations from what you said…',
-  },
-};
 
 const nonTranscriptMessages = new Set([
   'just talk it out…',
@@ -94,15 +77,14 @@ function TranscriptTrail({
 
 export function RecommendationSessionPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeKey = `${location.pathname}${location.search}`;
   const [searchParams] = useSearchParams();
   const requestedMode = searchParams.get('mode') as RecommendationMode | null;
   const mode = validModes.includes(requestedMode ?? 'discover')
     ? (requestedMode ?? 'discover')
     : 'discover';
 
-  const [demoState, setDemoState] = useState<DemoState>('listening');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [isUpdatingResults, setIsUpdatingResults] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
   const [transcriptHistory, setTranscriptHistory] = useState<TranscriptEntry[]>([]);
   const transcriptSequence = useRef(0);
@@ -112,40 +94,28 @@ export function RecommendationSessionPage() {
   const phase = useRecommendationStore((state) => state.phase);
   const round = useRecommendationStore((state) => state.round);
   const contentIds = useRecommendationStore((state) => state.contentIds);
-  const { status, transcript, start, simulateTurn, pause, resume, end } = useVoiceAgent();
+  const criteria = useRecommendationStore((state) => state.criteria);
+  const agentMessage = useRecommendationStore((state) => state.agentMessage);
+  const error = useRecommendationStore((state) => state.error);
+  const focusedContentId = useRecommendationStore((state) => state.focusedContentId);
+  const focusContent = useRecommendationStore((state) => state.focusContent);
+  const { status, transcript, start, pause, resume, end } = useVoiceAgent();
 
   useEffect(() => {
     if (!activeProfileId) return;
-    setDemoState('listening');
     void start(mode, activeProfileId);
   }, [activeProfileId, mode, start]);
 
-  const recommendations = useMemo(() => {
-    const recommendedOrder = new Map(contentIds.map((id, index) => [id, index]));
-
-    return [...contentService.getAll()]
-      .sort((first, second) => {
-        const firstPosition = recommendedOrder.get(first.id) ?? Number.MAX_SAFE_INTEGER;
-        const secondPosition = recommendedOrder.get(second.id) ?? Number.MAX_SAFE_INTEGER;
-        return firstPosition - secondPosition;
-      })
-      .slice(0, 8);
-  }, [contentIds]);
+  const recommendations = useMemo(() =>
+    contentIds.flatMap((id) => contentService.getById(id) ?? []).slice(0, 8), [contentIds]);
 
   const isPaused = phase === 'exploring';
-  const isConversationScene = demoState !== 'recommendations';
+  const isConversationScene = round === 0;
+  const isUpdatingResults = !isPaused && status === 'processing';
   const auroraActive = isConversationScene && !isPaused && !isEnding;
-  const orbStateLabel = demoState === 'processing'
-    ? 'Thinking…'
-    : demoState === 'question'
-      ? 'Speaking'
-      : demoState === 'transcript'
-        ? 'Listening'
-        : status === 'speaking'
-          ? 'Speaking'
-          : status === 'processing'
-            ? 'Thinking…'
-            : 'Listening';
+  const orbStateLabel = status === 'disconnected'
+    ? 'Disconnected'
+    : status === 'speaking' ? 'Speaking' : status === 'processing' ? 'Thinking…' : 'Listening';
 
   const addTranscript = useCallback((role: TranscriptRole, value: string) => {
     const text = value.trim();
@@ -180,79 +150,20 @@ export function RecommendationSessionPage() {
     addTranscript(status === 'speaking' ? 'compass' : 'you', transcript);
   }, [addTranscript, status, transcript]);
 
-  const showRecommendations = useCallback(async () => {
-    if (isGenerating) return;
-
-    setIsGenerating(true);
-    setDemoState('processing');
-    await simulateTurn();
-    setDemoState('recommendations');
-    setIsGenerating(false);
-    window.setTimeout(() => focusManager.focusInitial(), 120);
-  }, [isGenerating, simulateTurn]);
-
-  const updateRecommendations = useCallback(async () => {
-    if (isGenerating || isUpdatingResults || isPaused || demoState !== 'recommendations') {
-      return;
-    }
-
-    setIsUpdatingResults(true);
-    await simulateTurn();
-    setIsUpdatingResults(false);
-  }, [demoState, isGenerating, isPaused, isUpdatingResults, simulateTurn]);
-
-  const selectDemoState = useCallback((nextState: DemoState) => {
-    if (nextState === 'recommendations') {
-      void showRecommendations();
-      return;
-    }
-
-    if (nextState === 'transcript') {
-      addTranscript('you', stateCopy.transcript.caption);
-    } else if (nextState === 'question') {
-      addTranscript('compass', stateCopy.question.caption);
-    }
-
-    setDemoState(nextState);
-    window.setTimeout(() => focusManager.focusInitial(), 60);
-  }, [addTranscript, showRecommendations]);
-
   useEffect(() => {
-    const handleDemoShortcut = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
-      const shortcutStates: Partial<Record<string, DemoState>> = {
-        '1': 'listening',
-        '2': 'transcript',
-        '3': 'question',
-        '4': 'recommendations',
-      };
-
-      if (event.key === '5') {
-        event.preventDefault();
-        void updateRecommendations();
-        return;
-      }
-
-      const nextState = shortcutStates[event.key];
-      if (!nextState) return;
-
-      event.preventDefault();
-      selectDemoState(nextState);
-    };
-
-    window.addEventListener('keydown', handleDemoShortcut);
-    return () => window.removeEventListener('keydown', handleDemoShortcut);
-  }, [selectDemoState, updateRecommendations]);
+    const timeout = window.setTimeout(() => {
+      if (document.activeElement instanceof HTMLElement
+        && document.activeElement.dataset.focusable === 'true') return;
+      if (!focusManager.restore(routeKey)) focusManager.focusInitial();
+    }, shouldReduceMotion ? 120 : 500);
+    return () => window.clearTimeout(timeout);
+  }, [contentIds, isConversationScene, routeKey, shouldReduceMotion]);
 
   const handlePause = async () => {
     await pause();
     window.setTimeout(() => {
-      document
-        .querySelector<HTMLElement>('.live-recommendation-grid [data-focusable="true"]')
-        ?.focus();
+      const candidates = [...document.querySelectorAll<HTMLElement>('.live-recommendation-grid [data-focusable="true"]')];
+      (candidates.find((card) => card.dataset.focusKey === `content:${focusedContentId}`) ?? candidates[0])?.focus();
     }, 80);
   };
 
@@ -291,7 +202,7 @@ export function RecommendationSessionPage() {
           {isConversationScene ? (
             <motion.div
               key="conversation"
-              className={`voice-session voice-session--conversation voice-session-state--${demoState}`}
+              className={`voice-session voice-session--conversation voice-session-state--${status === 'speaking' ? 'question' : status}`}
               {...sceneMotion}
               transition={{ duration: shouldReduceMotion ? 0.01 : 0.42, ease: [0.22, 1, 0.36, 1] }}
             >
@@ -345,7 +256,7 @@ export function RecommendationSessionPage() {
                   entries={transcriptHistory}
                   placement="conversation"
                   reduceMotion={Boolean(shouldReduceMotion)}
-                  emptyMessage={orbStateLabel === 'Listening' ? stateCopy.listening.caption : undefined}
+                  emptyMessage={orbStateLabel === 'Listening' ? 'Just talk it out…' : undefined}
                 />
                 <span className="sr-only">{transcript}</span>
               </section>
@@ -359,23 +270,35 @@ export function RecommendationSessionPage() {
               transition={{ duration: shouldReduceMotion ? 0.01 : 0.48, ease: [0.22, 1, 0.36, 1] }}
             >
               <section className="live-recommendation-grid" aria-label="Live recommendations">
-                {recommendations.map((content, index) => (
-                  <div
-                    key={content.id}
-                    className={`live-recommendation-item live-recommendation-item--${round % 2 === 0 ? 'even' : 'odd'}`}
-                    style={{ animationDelay: `${80 + index * 75}ms` }}
-                  >
-                    <ContentCard
-                      content={content}
-                      defaultFocus={isPaused && index === 0}
-                    />
-                  </div>
-                ))}
+                <AnimatePresence initial={false}>
+                  {recommendations.map((content) => (
+                    <motion.div
+                      key={content.id}
+                      layout={shouldReduceMotion ? false : 'position'}
+                      className="live-recommendation-item"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: shouldReduceMotion ? 0 : 0.3 }}
+                    >
+                      <ContentCard
+                        content={content}
+                        defaultFocus={isPaused && content.id === focusedContentId}
+                        onFocus={() => focusContent(content.id)}
+                        onOpen={() => {
+                          focusContent(content.id);
+                          void pause();
+                        }}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                {recommendations.length === 0 && <p>No matching titles. Try changing your preferences.</p>}
               </section>
 
               <aside className="conversation-rail" aria-live="polite">
                 <p className="conversation-rail__instruction">
-                  Tell me to stop or<br />pause to check the<br />recommendations
+                  {agentMessage}
                 </p>
 
                 <div className="conversation-rail__control">
@@ -393,16 +316,16 @@ export function RecommendationSessionPage() {
                     data-focusable="true"
                     data-focus-default={isPaused ? undefined : 'true'}
                     data-voice-trigger="true"
-                    disabled={isUpdatingResults}
+                    disabled={status === 'disconnected'}
                     onClick={() => void (isPaused ? handleResume() : handlePause())}
                     transition={{ type: 'spring', stiffness: 170, damping: 23 }}
                   >
-                    {isUpdatingResults ? 'Refining…' : isPaused ? 'Resume' : 'Pause'}
+                    {isPaused ? 'Resume' : 'Pause'}
                   </motion.button>
                 </div>
 
                 <p className="conversation-rail__instruction">
-                  Keep talking to<br />refine the<br />recommendations
+                  {criteria.join(' · ') || 'Keep talking to refine your recommendations.'}
                 </p>
                 <span className="sr-only">{transcript}</span>
               </aside>
@@ -416,14 +339,12 @@ export function RecommendationSessionPage() {
           )}
         </AnimatePresence>
 
-        <div className="voice-demo-shortcuts" aria-label="Demo state shortcuts">
-          <span>Demo</span>
-          <span><kbd>1</kbd> Listen</span>
-          <span><kbd>2</kbd> Transcript</span>
-          <span><kbd>3</kbd> Question</span>
-          <span><kbd>4</kbd> Results</span>
-          <span><kbd>5</kbd> Refine</span>
-        </div>
+        {error && <p className="session-error" role="alert">{error}</p>}
+        {!isConversationScene && (
+          <button className="session-end" data-focusable="true" onClick={() => void handleStopConversation()}>
+            End conversation
+          </button>
+        )}
       </div>
     </LayoutGroup>
   );

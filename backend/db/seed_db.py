@@ -1,10 +1,11 @@
 import json
-from database import init_db, insert_log
+from pathlib import Path
+from db.database import init_db, insert_log
 
 def seed_database():
     init_db()
     try:
-        with open("tv_logs.json", "r") as f:
+        with open(Path(__file__).resolve().parents[1] / "data" / "tv_logs.json", "r") as f:
             logs = json.load(f)
             
         for log in logs:

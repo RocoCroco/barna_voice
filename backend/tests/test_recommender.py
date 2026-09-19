@@ -1,4 +1,4 @@
-import recommender
+from recommender import recommender
 
 KNOWN_USER = "user_1_cinephile"
 
