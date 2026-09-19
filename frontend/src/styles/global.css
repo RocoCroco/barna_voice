@@ -326,6 +326,7 @@ button:disabled {
 }
 
 .session-end,
+.session-end:focus,
 .session-error {
   position: absolute;
   z-index: 12;
