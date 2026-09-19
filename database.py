@@ -68,6 +68,87 @@ def get_recent_user_logs(user_id: str, limit: int = 30) -> List[Dict[str, Any]]:
     ]
 
 
+def query_logs(
+    user_id: str | None = None,
+    genre: str | None = None,
+    action_type: str | None = None,
+    limit: int = 100,
+) -> List[Dict[str, Any]]:
+    """Returns activity logs filtered by any combination of user, genre and action."""
+    clauses: List[str] = []
+    params: List[Any] = []
+    if user_id:
+        clauses.append("user_id = ?")
+        params.append(user_id)
+    if genre:
+        clauses.append("json_extract(metadata, '$.genre') = ?")
+        params.append(genre)
+    if action_type:
+        clauses.append("action_type = ?")
+        params.append(action_type)
+
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    sql = (
+        "SELECT timestamp, user_id, action_type, metadata "
+        f"FROM activity_logs {where} ORDER BY timestamp DESC LIMIT ?"
+    )
+    params.append(max(1, min(int(limit), 1000)))
+
+    with get_db() as conn:
+        rows = conn.execute(sql, params).fetchall()
+
+    return [
+        {
+            "timestamp": row["timestamp"],
+            "user_id": row["user_id"],
+            "action_type": row["action_type"],
+            "metadata": json.loads(row["metadata"]),
+        }
+        for row in rows
+    ]
+
+
+def get_distinct_users() -> List[str]:
+    """Returns every user_id present in the logs."""
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT user_id FROM activity_logs ORDER BY user_id"
+        ).fetchall()
+    return [row["user_id"] for row in rows]
+
+
+def get_distinct_genres() -> List[str]:
+    """Returns every genre found in the logs' metadata."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT json_extract(metadata, '$.genre') AS genre
+            FROM activity_logs
+            WHERE genre IS NOT NULL
+            ORDER BY genre
+            """
+        ).fetchall()
+    return [row["genre"] for row in rows]
+
+
+def get_user_genre_stats(user_id: str) -> List[Dict[str, Any]]:
+    """Returns how many completed items a user has per genre, most watched first."""
+    with get_db() as conn:
+        rows = conn.execute(
+            """
+            SELECT json_extract(metadata, '$.genre') AS genre, COUNT(*) AS count
+            FROM activity_logs
+            WHERE user_id = ?
+              AND action_type = 'content_completed'
+              AND genre IS NOT NULL
+            GROUP BY genre
+            ORDER BY count DESC
+            """,
+            (user_id,),
+        ).fetchall()
+    return [{"genre": row["genre"], "count": row["count"]} for row in rows]
+
+
 def update_db_from_json(json_file_path: str) -> int:
     """Loads activity logs from a JSON file and inserts them into the database.
 

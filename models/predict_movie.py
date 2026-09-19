@@ -19,7 +19,7 @@ def train_and_validate():
             timestamp,
             action_type,
             json_extract(metadata, '$.genre')      AS genre,
-            json_extract(metadata, '$.mock_title') AS title
+            json_extract(metadata, '$.title')      AS title
         FROM activity_logs
     """
     df = pd.read_sql(query, conn)
