@@ -12,6 +12,7 @@ def discover_scripts() -> list[Path]:
     return sorted(
         p for p in MODELS_DIR.glob("*.py")
         if p.name not in {"__init__.py", Path(__file__).name}
+        and not p.name.startswith("test_")
     )
 
 
