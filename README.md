@@ -17,7 +17,7 @@ ML-based recommendations; it is not yet wired into the frontend or voice agent.
 | --- | --- | --- |
 | TV interface | Working MVP | Browser simulation of the Titan OS experience |
 | Remote navigation | Working | Directional focus, OK, Back and voice shortcut |
-| Profile selection | Simulated | Service boundary is ready for the backend |
+| Profile selection | Integrated | Backend usernames from `GET /api/users` |
 | Voice conversation | Working | Real microphone, STT, LLM, TTS and speaker output |
 | Recommendation UI | Working simulation | Mock catalogue and animated refinement rounds |
 | Backend API | Working prototype | FastAPI service with catalogue, logs and ML recommendations, not yet integrated |
@@ -181,7 +181,8 @@ The backend (see [BACKEND.md](./BACKEND.md)) already implements catalogue,
 logging and recommendation endpoints. The frontend and voice layers still need
 to be wired up to it for:
 
-1. `GET /profiles` and active-profile selection (not yet in the backend);
+1. active-profile context in recommendation tools (`GET /api/users` already
+   supplies profiles; profile IDs are usernames);
 2. catalogue search constrained by real availability;
 3. recommendation and refinement tools called by the voice agent, via the
    existing `/api/content/*` and `/api/tool/*` endpoints;
@@ -189,5 +190,5 @@ to be wired up to it for:
    session;
 5. content detail and playback/deep-link actions.
 
-Until that wiring exists, profiles, catalogue content and recommendation
-rounds in the frontend remain deliberately labelled simulations.
+Until that wiring exists, catalogue content and recommendation rounds in the
+frontend remain deliberately labelled simulations.
