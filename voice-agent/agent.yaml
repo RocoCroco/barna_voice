@@ -9,6 +9,9 @@ agents:
     speak: compass_voice
     tools:
       - end_call
+      - recommend_titles
+      - refine_recommendations
+      - get_content_details
 
 secrets:
   - NEBIUS_API_KEY
@@ -47,6 +50,9 @@ models:
 
 tools:
   - end_call
+  - recommend_titles
+  - refine_recommendations
+  - get_content_details
 
 conversation:
   greeting:

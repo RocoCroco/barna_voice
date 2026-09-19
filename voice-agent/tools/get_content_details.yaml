@@ -1,0 +1,12 @@
+description: Look up an exact content_id returned by a recommendation tool in this session. Never invent metadata or availability.
+input:
+  type: object
+  properties:
+    content_id:
+      type: string
+  required: [content_id]
+  additionalProperties: false
+local:
+  handler: tools/recommendations.py
+interruption: provider_default
+effect: returns_data

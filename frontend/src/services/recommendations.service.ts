@@ -1,70 +1,63 @@
-import type {
-  RecommendationMode,
-  RecommendationRound,
-} from '../types/content';
+import type { RecommendationMode, RecommendationRound } from '../types/content';
+import { contentService } from './content.service';
 
-const rounds: Record<RecommendationMode, RecommendationRound[]> = {
-  discover: [
-    {
-      message:
-        'I have picked three different places to start. We can refine them as we talk.',
-      criteria: ['Good for a group', 'Under 2 hours'],
-      contentIds: ['orbit-house', 'soft-landing', 'velvet-code'],
-    },
-    {
-      message:
-        'Got it: something more mature, with a story that pulls you in from the start.',
-      criteria: ['Good for a group', 'Under 2 hours', 'More mature'],
-      contentIds: ['afterlight', 'quiet-current', 'orbit-house'],
-    },
-    {
-      message:
-        'I will keep the runtime, but raise the pace without making it too violent.',
-      criteria: ['Under 2 hours', 'More mature', 'Faster pace'],
-      contentIds: ['northern-line', 'afterlight', 'orbit-house'],
-    },
-  ],
-  consensus: [
-    {
-      message:
-        'Tell me what each person feels like watching. I will find common ground without creating profiles.',
-      criteria: ['Several viewers', 'Session-only preferences'],
-      contentIds: ['soft-landing', 'orbit-house', 'small-wonders'],
-    },
-    {
-      message:
-        'I can see the overlap: adventure, some humour and nothing too long.',
-      criteria: ['Adventure', 'Some humour', 'Under 2 hours'],
-      contentIds: ['orbit-house', 'soft-landing', 'northern-line'],
-    },
-  ],
-  decide: [
-    {
-      message:
-        'I will ask only a few questions and narrow it down to three finalists.',
-      criteria: ['Quick decision', 'Three finalists'],
-      contentIds: ['afterlight', 'orbit-house', 'quiet-current'],
-    },
-    {
-      message:
-        'My pick is Afterlight: it best matches your available time and the tone you asked for.',
-      criteria: ['Final pick', 'Under 2 hours', 'Light mystery'],
-      contentIds: ['afterlight', 'orbit-house', 'quiet-current'],
-    },
-  ],
-};
+export interface Preferences {
+  genre?: string | null;
+  duration?: number | null;
+  mood?: string | null;
+  content_types?: ('movie' | 'show' | 'sport')[];
+  participants?: ParticipantPreferences[];
+}
+
+export interface ParticipantPreferences {
+  user_id?: string;
+  genre?: string | null;
+  duration?: number | null;
+  mood?: string | null;
+}
+
+export const recommendationEndpoints = {
+  discover: '/api/content/preference',
+  consensus: '/api/content/room',
+  decide: '/api/content/decide',
+} satisfies Record<RecommendationMode, string>;
+
+export function preferenceCriteria(preferences: Preferences): string[] {
+  const describe = (entry: ParticipantPreferences) => [
+    entry.genre,
+    entry.duration ? `Up to ${entry.duration} minutes` : null,
+    entry.mood,
+  ].filter((value): value is string => Boolean(value));
+  return [...new Set([
+    ...describe(preferences),
+    ...(preferences.content_types ?? []),
+    ...(preferences.participants ?? []).flatMap(describe),
+  ])];
+}
 
 export const recommendationsService = {
-  getRound(
+  async getRound(
     mode: RecommendationMode,
-    index: number,
-    profileId?: string | null,
-  ): RecommendationRound {
-    void profileId;
-    const availableRounds = rounds[mode];
-    return availableRounds[Math.min(index, availableRounds.length - 1)];
-  },
-  hasNextRound(mode: RecommendationMode, index: number): boolean {
-    return index < rounds[mode].length - 1;
+    preferences: Preferences,
+    profileId: string,
+  ): Promise<RecommendationRound> {
+    const { genre, duration, mood, content_types } = preferences;
+    const common = { count: 8, content_types };
+    const body = mode === 'decide'
+      ? { ...common, user_id: profileId }
+      : mode === 'consensus'
+        ? {
+            ...common,
+            participants: preferences.participants?.length
+              ? preferences.participants
+              : [{ user_id: profileId, genre, duration, mood }],
+          }
+        : { ...common, genre, duration, mood };
+    const items = await contentService.request(recommendationEndpoints[mode], body);
+    return {
+      message: items.length ? 'Here are your picks. Tell me what you would like to change.' : 'No titles were returned.',
+      criteria: mode === 'decide' ? ['Based on your viewing history'] : preferenceCriteria(preferences),
+      contentIds: items.map((item) => item.id),
+    };
   },
 };

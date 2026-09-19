@@ -3,16 +3,23 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import pandas as pd
 
-import database
-import recommender
+from db import database
+from recommender import recommender
 
 app = FastAPI(title="CTV ML Recommender")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", "X-Profile-Id"],
+)
 
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parents[1] / "models"
 
 # Each model is a bundle: the classifier plus the LabelEncoders it needs.
 MODEL_SPECS = {

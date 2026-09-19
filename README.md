@@ -9,7 +9,7 @@ understandable set of recommendations.
 This repository contains the TV frontend, the independently deployable voice
 agent, and a FastAPI backend prototype. The backend already serves a unified
 content catalogue (movies, TV schedule and live football), activity logs and
-ML-based recommendations; it is not yet wired into the frontend or voice agent.
+ML-based recommendations. The frontend and voice tools use its existing endpoints.
 
 ## Current status
 
@@ -17,11 +17,11 @@ ML-based recommendations; it is not yet wired into the frontend or voice agent.
 | --- | --- | --- |
 | TV interface | Working MVP | Browser simulation of the Titan OS experience |
 | Remote navigation | Working | Directional focus, OK, Back and voice shortcut |
-| Profile selection | Simulated | Service boundary is ready for the backend |
+| Profile selection | Integrated | Backend usernames from `GET /api/users` |
 | Voice conversation | Working | Real microphone, STT, LLM, TTS and speaker output |
-| Recommendation UI | Working simulation | Mock catalogue and animated refinement rounds |
-| Backend API | Working prototype | FastAPI service with catalogue, logs and ML recommendations, not yet integrated |
-| Voice-driven recommendations | Pending integration | Agent tools and recommendation events still need to call the backend |
+| Recommendation UI | Integrated | Real backend items, session-cached details and animated refinement |
+| Backend API | Integrated | FastAPI recommendation endpoints; profiles are backend usernames |
+| Voice-driven recommendations | Implemented | Scoped tools emit structured events over the existing WebRTC connection |
 | Titan OS device validation | Pending | The browser currently simulates the TV environment |
 
 ## Architecture
@@ -33,7 +33,7 @@ ML-based recommendations; it is not yet wired into the frontend or voice agent.
 │ Profile / Home / Recommendation UI     Pipecat JS client         │
 │ TV focus + remote navigation            SmallWebRTC transport     │
 └─────────────────────┬──────────────────────────┬─────────────────┘
-                      │ future HTTP API          │ WebRTC audio/data
+                      │ HTTP API                 │ WebRTC audio/data
                       ▼                          ▼
               ┌───────────────┐       ┌────────────────────────────┐
               │ Product       │◄──────│ Voice agent                │
@@ -115,8 +115,8 @@ declarative instead of being embedded throughout application code.
 Nebius Token Factory provides the LLM for every conversational turn. The current
 model is `Qwen/Qwen3-30B-A3B-Instruct-2507`, accessed through Nebius' OpenAI-
 compatible endpoint. It interprets viewing intent, decides which clarification
-is valuable and produces concise spoken responses. Once the backend is ready,
-the same model will invoke catalogue and recommendation tools using the active
+is valuable and produces concise spoken responses. The same model invokes
+recommendation and cached-detail tools using the active
 `profileId`.
 
 This is a meaningful dependency: replacing or removing Nebius removes the
@@ -124,7 +124,16 @@ reasoning layer of the live agent rather than a peripheral feature.
 
 ## Run locally
 
-### 1. Configure the voice agent
+### 1. Start the backend
+
+Install the dependencies and train the models as described in [BACKEND.md](./BACKEND.md), then:
+
+```sh
+cd backend
+uvicorn app.main:app --reload --port 8000
+```
+
+### 2. Configure the voice agent
 
 Copy the example and add local credentials. Never commit or expose these values
 through a Vite variable.
@@ -139,17 +148,23 @@ Required variables:
 - `NEBIUS_API_KEY`
 - `NEBIUS_BASE_URL`
 
-### 2. Start the voice runtime
+### 3. Start the voice runtime
 
 ```powershell
 .\voice-agent\scripts\dev.ps1
+```
+
+On Linux/macOS, with Unmute 0.4.2 and uv on PATH:
+
+```sh
+python voice-agent/run.py
 ```
 
 The agent listens on `http://localhost:7860`. Leave it running while using the
 Compass frontend. An idle server does not hold an active conversation; disconnect
 voice sessions after testing to conserve SLNG credit.
 
-### 3. Start the frontend
+### 4. Start the frontend
 
 ```powershell
 cd frontend
@@ -165,7 +180,6 @@ Open `http://localhost:5173`. Allow microphone access when prompted.
 - `Enter`: select.
 - `Escape` or browser Back: return.
 - `V`: activate the current voice control.
-- `1`–`5` on the recommendation route: temporary visual-state demo controls.
 
 ## Documentation
 
@@ -175,19 +189,23 @@ Open `http://localhost:5173`. Allow microphone access when prompted.
 - [Voice-agent architecture](./voice-agent/README.md)
 - [Challenge demo guide](./DEMO_GUIDE.md)
 
-## Next backend integration
+## Recommendation flow
 
-The backend (see [BACKEND.md](./BACKEND.md)) already implements catalogue,
-logging and recommendation endpoints. The frontend and voice layers still need
-to be wired up to it for:
+`Profile.id` is the backend username. HTTP requests send `X-Profile-Id`, and
+the WebRTC start body carries `{ sessionId, profileId, mode }`.
 
-1. `GET /profiles` and active-profile selection (not yet in the backend);
-2. catalogue search constrained by real availability;
-3. recommendation and refinement tools called by the voice agent, via the
-   existing `/api/content/*` and `/api/tool/*` endpoints;
-4. structured events that update the visible grid without ending the voice
-   session;
-5. content detail and playback/deep-link actions.
+| Frontend mode | Backend endpoint |
+| --- | --- |
+| `discover` | `POST /api/content/preference` |
+| `consensus` | `POST /api/content/room` |
+| `decide` | `POST /api/content/decide` |
 
-Until that wiring exists, profiles, catalogue content and recommendation
-rounds in the frontend remain deliberately labelled simulations.
+Voice tools merge structured preferences and emit `recommendations.updated`.
+The frontend adapts the event's catalogue items into the same session cache used
+by the board and detail page. Pause mutes microphone and remote audio; navigating
+to details and back keeps the connection, candidates and selection. Resume uses
+that connection. Leaving the session for Home or profiles clears its context.
+
+The backend has no content-by-ID route: details are available only for items
+cached during this session. Refreshing the browser loses that cache.
+Playback and provider deep links remain future work.
