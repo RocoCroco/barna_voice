@@ -8,7 +8,7 @@ interface VoiceSessionBackgroundProps {
 
 export function VoiceSessionBackground({
   auroraActive,
-  reduceMotion: _reduceMotion,
+  reduceMotion,
 }: VoiceSessionBackgroundProps) {
   return (
     <div
@@ -17,11 +17,11 @@ export function VoiceSessionBackground({
     >
       <MoltenMetal
         className="voice-session-background__metal"
-        paused={false}
+        paused={reduceMotion}
       />
       <SoftAurora
         className="voice-session-background__aurora"
-        paused={!auroraActive}
+        paused={reduceMotion || !auroraActive}
       />
       <div className="voice-session-background__veil" />
     </div>
