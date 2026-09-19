@@ -8,6 +8,7 @@ import { voiceProvider } from './VoiceProvider';
 type Options = ConstructorParameters<typeof PipecatClient>[0];
 interface ClientDouble {
   options: Options;
+  audio: { stop: ReturnType<typeof vi.fn> };
   initDevices: ReturnType<typeof vi.fn>;
   startBotAndConnect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
@@ -17,6 +18,8 @@ const mock = vi.hoisted(() => ({ clients: [] as ClientDouble[] }));
 
 vi.mock('@pipecat-ai/client-js', () => ({
   PipecatClient: class {
+    audio = { stop: vi.fn() };
+    tracks = vi.fn(() => ({ local: { audio: this.audio } }));
     mediaState = { mic: { state: 'granted' } };
     initDevices = vi.fn().mockResolvedValue(undefined);
     startBotAndConnect = vi.fn().mockResolvedValue(undefined);
@@ -112,8 +115,21 @@ it('does not resurrect a cancelled connection or accept callbacks from its old c
   finish();
   await connection;
   expect(voiceProvider.isConnected()).toBe(false);
+  expect(old.audio.stop).toHaveBeenCalled();
   old.options.callbacks?.onConnected?.();
   expect(voiceProvider.isConnected()).toBe(false);
   old.options.callbacks?.onBotStartedSpeaking?.();
+  expect(useVoiceStore.getState().status).toBe('disconnected');
+});
+
+it('releases the microphone when bot startup fails before a peer connection exists', async () => {
+  const connection = voiceProvider.connect(context());
+  const client = mock.clients[0];
+  client.startBotAndConnect.mockRejectedValue(new Error('Failed to fetch'));
+  await expect(connection).rejects.toThrow('Failed to fetch');
+  expect(client.audio.stop).toHaveBeenCalled();
+  expect(client.enableMic).toHaveBeenCalledWith(false);
+  expect(client.disconnect).toHaveBeenCalled();
+  expect(voiceProvider.isConnected()).toBe(false);
   expect(useVoiceStore.getState().status).toBe('disconnected');
 });

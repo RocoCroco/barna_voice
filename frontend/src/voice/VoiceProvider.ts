@@ -88,6 +88,16 @@ class PipecatVoiceProvider implements VoiceProvider {
     this.remoteAudioTrackId = null;
   }
 
+  private async releaseClient(client: PipecatClient): Promise<void> {
+    client.enableMic(false);
+    for (const track of Object.values(client.tracks().local)) track?.stop();
+    try {
+      await client.disconnect();
+    } catch {
+      // The agent may have already ended the session; local cleanup still succeeds.
+    }
+  }
+
   private createClient() {
     const voice = (status: VoiceStatus, transcript?: string) => {
       if (this.client === client) setVoice(status, transcript);
@@ -170,7 +180,7 @@ class PipecatVoiceProvider implements VoiceProvider {
     this.connection = (async () => {
       await client.initDevices();
       if (this.client !== client) {
-        await client.disconnect();
+        await this.releaseClient(client);
         return;
       }
       if (client.mediaState.mic.state !== 'granted') {
@@ -191,7 +201,7 @@ class PipecatVoiceProvider implements VoiceProvider {
     })()
       .then(() => {
         if (this.client !== client) {
-          void client.disconnect().catch(() => {});
+          void this.releaseClient(client);
           return;
         }
         this.connected = true;
@@ -221,13 +231,7 @@ class PipecatVoiceProvider implements VoiceProvider {
     this.listening = false;
     this.sessionId = null;
     this.stopRemoteAudio();
-    if (client) {
-      try {
-        await client.disconnect();
-      } catch {
-        // The agent may have already ended the session; local cleanup still succeeds.
-      }
-    }
+    if (client) await this.releaseClient(client);
     if (!this.client) setVoice('disconnected');
   }
 
