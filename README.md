@@ -1,5 +1,5 @@
 # barna_voice
-
+```text
 ┌──────────────────────── Web App ────────────────────────┐
 │                                                        │
 │  UI catálogo / listas / perfil      Voice interface    │
@@ -21,3 +21,4 @@ User/Profile DB    Recommendation Service
      │                  └─ catálogo de películas
      │
      └──────────────────┘
+```
