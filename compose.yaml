@@ -1,0 +1,69 @@
+name: compass
+
+x-service: &service
+  restart: unless-stopped
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  backend:
+    <<: *service
+    build: ./backend
+    image: compass-backend:${IMAGE_TAG:-local}
+    environment:
+      COMPASS_DB_PATH: /data/tv_logs.db
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+    volumes:
+      - backend-data:/data
+
+  voice-agent:
+    <<: *service
+    build: ./voice-agent
+    image: compass-voice-agent:${IMAGE_TAG:-local}
+    environment:
+      BACKEND_URL: http://backend:8000
+      SLNG_API_KEY: ${SLNG_API_KEY:-}
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      NEBIUS_BASE_URL: ${NEBIUS_BASE_URL:-https://api.tokenfactory.nebius.com/v1/}
+      PIPECAT_ICE_SERVERS: ${PIPECAT_ICE_SERVERS:-stun:stun.l.google.com:19302}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "40000-40100:40000-40100/udp"
+    sysctls:
+      net.ipv4.ip_local_port_range: "40000 40100"
+    stop_grace_period: 30s
+
+  frontend:
+    <<: *service
+    build: ./frontend
+    image: compass-frontend:${IMAGE_TAG:-local}
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "0"
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      voice-agent:
+        condition: service_healthy
+
+volumes:
+  backend-data:
+  caddy-data:
+  caddy-config:
