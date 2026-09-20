@@ -1,9 +1,10 @@
 import sqlite3
 import json
+import os
 from pathlib import Path
 from typing import List, Dict, Any
 
-DB_NAME = str(Path(__file__).resolve().parent / "tv_logs.db")
+DB_NAME = os.environ.get("COMPASS_DB_PATH", str(Path(__file__).resolve().parent / "tv_logs.db"))
 
 def get_db():
     conn = sqlite3.connect(DB_NAME)
