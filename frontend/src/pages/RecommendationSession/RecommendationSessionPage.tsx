@@ -41,7 +41,7 @@ function TranscriptTrail({
   reduceMotion: boolean;
   emptyMessage?: string;
 }) {
-  const visibleEntries = entries.slice(-3).reverse();
+  const visibleEntries = entries.slice(placement === 'results' ? -1 : -3).reverse();
 
   return (
     <div
@@ -147,6 +147,7 @@ export function RecommendationSessionPage() {
   useEffect(() => {
     if (transcript === lastObservedTranscript.current) return;
     lastObservedTranscript.current = transcript;
+    if (status === 'disconnected' || status === 'paused') return;
     addTranscript(status === 'speaking' ? 'compass' : 'you', transcript);
   }, [addTranscript, status, transcript]);
 

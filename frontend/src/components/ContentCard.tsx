@@ -30,8 +30,14 @@ export function ContentCard({
       onFocus={onFocus}
       onClick={onOpen}
     >
-      <span className="content-card__art" aria-hidden="true">
-        <span className="content-card__monogram">{content.title.slice(0, 1)}</span>
+      <span
+        className={`content-card__art ${content.posterUrl ? 'content-card__art--image' : ''}`}
+        style={content.posterUrl ? { backgroundImage: `url("${content.posterUrl}")` } : undefined}
+        aria-hidden="true"
+      >
+        {!content.posterUrl && (
+          <span className="content-card__monogram">{content.title.slice(0, 1)}</span>
+        )}
       </span>
       <span className="content-card__shade" aria-hidden="true" />
       <span className="content-card__body">

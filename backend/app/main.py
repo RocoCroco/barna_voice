@@ -175,12 +175,14 @@ class DecideRequest(BaseModel):
     user_id: str
     count: int = 8
     content_types: Optional[list[str]] = None  # movie | show | sport
+    randomize: bool = False
 
 
 class PreferenceContentRequest(BaseModel):
     genre: Optional[str] = None
     duration: Optional[int] = None  # max runtime in minutes
     mood: Optional[str] = None
+    query: Optional[str] = None  # subject, setting, person or free-text theme
     count: int = 8
     content_types: Optional[list[str]] = None  # movie | show | sport
 
@@ -190,6 +192,7 @@ class RoomParticipant(BaseModel):
     genre: Optional[str] = None
     duration: Optional[int] = None
     mood: Optional[str] = None
+    query: Optional[str] = None
 
 
 class RoomRequest(BaseModel):
@@ -345,7 +348,8 @@ def slng_predict_genre(req: SlngToolRequest):
 def content_decide(req: DecideRequest):
     """'Decide for me': choose content from the user's own logs."""
     return recommender.decide_for_me(
-        req.user_id, k=req.count, content_types=req.content_types
+        req.user_id, k=req.count, content_types=req.content_types,
+        randomize=req.randomize,
     )
 
 
@@ -353,7 +357,7 @@ def content_decide(req: DecideRequest):
 def content_preference(req: PreferenceContentRequest):
     """User states genre / duration / mood; propose matching content."""
     return recommender.recommend_by_preference(
-        genre=req.genre, duration=req.duration, mood=req.mood,
+        genre=req.genre, duration=req.duration, mood=req.mood, query=req.query,
         k=req.count, content_types=req.content_types,
     )
 

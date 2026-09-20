@@ -16,6 +16,7 @@ class Participant(BaseModel):
     genre: str | None = None
     duration: int | None = Field(default=None, gt=0)
     mood: str | None = None
+    query: str | None = None
 
 
 class Preferences(Participant):
@@ -31,6 +32,9 @@ class CatalogueItem(BaseModel):
     runtime_minutes: int | None
     matched_genre: str | None = None
     release_year: int | None = None
+    poster_path: str | None = None
+    backdrop_path: str | None = None
+    synopsis: str | None = None
     air_date: str | None = None
     match_date: str | None = None
     channel: str | None = None
@@ -69,6 +73,8 @@ def _criteria(preferences: Preferences) -> list[str]:
             criteria.append(f"Up to {entry.duration} minutes")
         if entry.mood:
             criteria.append(entry.mood)
+        if entry.query:
+            criteria.append(entry.query)
     criteria.extend(preferences.content_types or [])
     return list(dict.fromkeys(criteria))
 
@@ -99,15 +105,18 @@ class RecommendationSession:
                     raise ValueError("Only the active profile or anonymous room participants may be used.")
                 common: dict[str, object] = {"count": 8, "content_types": preferences.content_types}
                 if self.mode == "decide":
-                    if preferences.genre or preferences.duration or preferences.mood:
-                        raise ValueError("Decide supports content types only. Use Discover for genre, runtime or mood.")
+                    if preferences.genre or preferences.duration or preferences.mood or preferences.query:
+                        raise ValueError("Decide chooses one surprise movie without filters. Use Discover for specific preferences.")
                     endpoint = "decide"
-                    body = {**common, "user_id": self.profile_id}
-                    criteria = ["Based on your viewing history", *(preferences.content_types or [])]
+                    body = {
+                        "count": 1, "content_types": ["movie"],
+                        "randomize": True, "user_id": self.profile_id,
+                    }
+                    criteria = ["One surprise movie"]
                 elif self.mode == "consensus":
                     endpoint = "room"
                     shared = preferences.model_dump(
-                        include={"genre", "duration", "mood"}, exclude_none=True,
+                        include={"genre", "duration", "mood", "query"}, exclude_none=True,
                     )
                     body = {
                         **common,
@@ -121,6 +130,7 @@ class RecommendationSession:
                     body = {
                         **common, "genre": preferences.genre,
                         "duration": preferences.duration, "mood": preferences.mood,
+                        "query": preferences.query,
                     }
                     criteria = _criteria(preferences)
                 response = await asyncio.to_thread(
@@ -140,7 +150,13 @@ class RecommendationSession:
             self.preferences = preferences
             self.revision += 1
             self.items.update((item.content_id(), item) for item in response.items)
-            message = "Here are your picks. What would you like to change?" if response.items else "No titles matched. What can we change?"
+            message = (
+                "Here is my pick for you."
+                if self.mode == "decide" and response.items
+                else "Here are your picks. What would you like to change?"
+                if response.items
+                else "No titles matched. What can we change?"
+            )
             event: dict[str, object] = {
                 "type": "recommendations.updated",
                 "sessionId": self.session_id, "profileId": self.profile_id,

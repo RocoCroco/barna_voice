@@ -7,6 +7,7 @@ import type { RecommendationsUpdated } from '../types/recommendations';
 const movie: BackendItem = {
   content_type: 'movie', title: 'Arrival', release_year: 2016,
   genres: ['Science Fiction'], runtime_minutes: 116, matched_genre: 'Sci-Fi',
+  poster_path: '/arrival.jpg',
 };
 
 function update(overrides: Partial<RecommendationsUpdated> = {}): RecommendationsUpdated {
@@ -33,6 +34,7 @@ describe('structured voice recommendations', () => {
     });
     expect(contentService.getById(contentId(movie))).toMatchObject({
       title: 'Arrival', recommendationReason: 'A thoughtful choice.',
+      posterUrl: 'https://image.tmdb.org/t/p/w500/arrival.jpg',
     });
   });
 

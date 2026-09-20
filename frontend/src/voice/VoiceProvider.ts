@@ -44,6 +44,12 @@ function errorText(value: unknown): string {
   return 'Compass could not start the voice session.';
 }
 
+function isRecoverableVoiceError(value: unknown): boolean {
+  const message = errorText(value).toLowerCase();
+  return message.includes('abandoned: interrupted mid-utterance')
+    || (message.includes('slng tts context') && message.includes('interrupted'));
+}
+
 class PipecatVoiceProvider implements VoiceProvider {
   private client: PipecatClient | null = null;
   private connection: Promise<void> | null = null;
@@ -51,6 +57,7 @@ class PipecatVoiceProvider implements VoiceProvider {
   private remoteAudioTrackId: string | null = null;
   private connected = false;
   private listening = false;
+  private micMuted = false;
   private sessionId: string | null = null;
 
   private playRemoteAudio(track: MediaStreamTrack) {
@@ -124,6 +131,8 @@ class PipecatVoiceProvider implements VoiceProvider {
           if (this.client !== client) return;
           this.connected = false;
           this.listening = false;
+          this.micMuted = false;
+          useVoiceStore.getState().setMicMuted(false);
           this.stopRemoteAudio();
           setVoice('disconnected');
           useRecommendationStore.getState().setError('Voice session ended. Start a new conversation from Home.');
@@ -155,6 +164,11 @@ class PipecatVoiceProvider implements VoiceProvider {
           fail(`Microphone unavailable: ${errorText(error)}`);
         },
         onError: (error) => {
+          if (isRecoverableVoiceError(error)) {
+            useRecommendationStore.getState().setError(null);
+            if (this.listening) voice('listening');
+            return;
+          }
           fail(errorText(error));
         },
       },
@@ -171,6 +185,8 @@ class PipecatVoiceProvider implements VoiceProvider {
 
     this.sessionId = context.sessionId;
     this.listening = true;
+    this.micMuted = false;
+    useVoiceStore.getState().setMicMuted(false);
     this.client = this.createClient();
     useVoiceStore.getState().setStatus('processing');
     useRecommendationStore.getState().setError(null);
@@ -205,7 +221,7 @@ class PipecatVoiceProvider implements VoiceProvider {
           return;
         }
         this.connected = true;
-        client.enableMic(this.listening);
+        client.enableMic(this.listening && !this.micMuted);
         if (this.listening) setVoice('listening', 'Just talk it out…');
       })
       .catch(async (error: unknown) => {
@@ -229,7 +245,9 @@ class PipecatVoiceProvider implements VoiceProvider {
     this.connection = null;
     this.connected = false;
     this.listening = false;
+    this.micMuted = false;
     this.sessionId = null;
+    useVoiceStore.getState().setMicMuted(false);
     this.stopRemoteAudio();
     if (client) await this.releaseClient(client);
     if (!this.client) setVoice('disconnected');
@@ -237,7 +255,7 @@ class PipecatVoiceProvider implements VoiceProvider {
 
   async startListening(): Promise<void> {
     if (!this.connected) throw new Error('Start a voice session before resuming.');
-    this.client?.enableMic(true);
+    this.client?.enableMic(!this.micMuted);
     this.listening = true;
     if (this.remoteAudio) this.remoteAudio.muted = false;
     useVoiceStore.getState().setStatus('listening');
@@ -251,12 +269,29 @@ class PipecatVoiceProvider implements VoiceProvider {
     if (this.connected || this.connection) setVoice('paused');
   }
 
+  setMicrophoneMuted(muted: boolean): void {
+    if (!this.connected && !this.connection) return;
+    this.micMuted = muted;
+    this.client?.enableMic(this.listening && !muted);
+    useVoiceStore.getState().setMicMuted(muted);
+  }
+
+  toggleMicrophoneMuted(): boolean {
+    if (!this.connected && !this.connection) return this.micMuted;
+    this.setMicrophoneMuted(!this.micMuted);
+    return this.micMuted;
+  }
+
   isConnected(): boolean {
     return this.connected;
   }
 
   isListening(): boolean {
     return this.listening;
+  }
+
+  isMicrophoneMuted(): boolean {
+    return this.micMuted;
   }
 }
 

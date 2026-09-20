@@ -20,7 +20,8 @@ function isBackendItem(value: unknown): value is BackendItem {
     && (value.matched_genre === null || typeof value.matched_genre === 'string')
     && ['release_year', 'vote_average'].every((key) =>
       value[key] == null || (typeof value[key] === 'number' && Number.isFinite(value[key])))
-    && ['channel', 'air_date', 'start_time', 'end_time', 'rating', 'league', 'match_date', 'kickoff_cet']
+    && ['channel', 'air_date', 'start_time', 'end_time', 'rating', 'league', 'match_date', 'kickoff_cet',
+      'poster_path', 'backdrop_path', 'synopsis']
       .every((key) => value[key] == null || typeof value[key] === 'string');
 }
 

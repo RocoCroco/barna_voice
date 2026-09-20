@@ -37,6 +37,14 @@ def test_decide_movies_only_filter():
     assert all(i["content_type"] == "movie" for i in items)
 
 
+def test_decide_random_returns_one_movie():
+    items = recommender.decide_for_me(
+        KNOWN_USER, k=1, content_types=["movie"], randomize=True,
+    )["items"]
+    assert len(items) == 1
+    assert items[0]["content_type"] == "movie"
+
+
 def test_decide_cold_start_unknown_user():
     result = recommender.decide_for_me("ghost_user", k=8, content_types=["movie"])
     assert result["status"] == "cold_start"
@@ -68,6 +76,26 @@ def test_preference_duration_cap():
 def test_preference_mood_returns_results():
     items = recommender.recommend_by_preference(mood="intense", k=8)["items"]
     assert len(items) == 8
+
+
+def test_preference_topic_matches_animals_without_unrelated_fill():
+    items = recommender.recommend_by_preference(
+        query="animals", content_types=["movie"], k=8,
+    )["items"]
+    assert items
+    returned = {item["title"] for item in items}
+    matching = recommender._filter_search_text(
+        recommender.get_catalog(), recommender._topic_to_terms("animals"),
+    )
+    assert returned <= set(matching["title"])
+
+
+def test_unknown_genre_is_treated_as_a_topic():
+    items = recommender.recommend_by_preference(
+        genre="maze", content_types=["movie"], k=8,
+    )["items"]
+    assert items
+    assert any("Maze" in item["title"] for item in items)
 
 
 def test_preference_genre_mapping_scifi():
@@ -121,3 +149,8 @@ def test_show_item_shape():
     assert item["content_type"] == "show"
     assert item["channel"]
     assert item["start_time"] and item["end_time"]
+
+
+def test_movie_item_includes_available_artwork():
+    items = recommender.recommend_by_preference(content_types=["movie"], k=20)["items"]
+    assert any(item.get("poster_path") or item.get("backdrop_path") for item in items)

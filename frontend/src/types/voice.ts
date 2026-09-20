@@ -19,6 +19,9 @@ export interface VoiceProvider {
   disconnect(): Promise<void>;
   startListening(): Promise<void>;
   stopListening(): Promise<void>;
+  setMicrophoneMuted(muted: boolean): void;
+  toggleMicrophoneMuted(): boolean;
   isConnected(): boolean;
   isListening(): boolean;
+  isMicrophoneMuted(): boolean;
 }

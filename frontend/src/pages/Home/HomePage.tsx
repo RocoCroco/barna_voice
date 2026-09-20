@@ -101,8 +101,8 @@ export function HomePage() {
               <UsersRound />
             </span>
             <span>
-              <strong>Room consensus</strong>
-              <small>Everyone speaks. Compass finds the common ground.</small>
+              <strong>Sofa consensus</strong>
+              <small>One answer each. Compass finds your common ground.</small>
             </span>
             <span className="mode-card__arrow" aria-hidden="true">
               <ArrowRight />
@@ -124,8 +124,8 @@ export function HomePage() {
               <Sparkles />
             </span>
             <span>
-              <strong>Decide for me</strong>
-              <small>A few questions. One confident choice.</small>
+              <strong>Pick for me</strong>
+              <small>One surprise movie. No questions.</small>
             </span>
             <span className="mode-card__arrow" aria-hidden="true">
               <ArrowRight />

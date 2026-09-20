@@ -133,3 +133,37 @@ it('releases the microphone when bot startup fails before a peer connection exis
   expect(voiceProvider.isConnected()).toBe(false);
   expect(useVoiceStore.getState().status).toBe('disconnected');
 });
+
+it('keeps the session alive when SLNG cancels interrupted speech', async () => {
+  await voiceProvider.connect(context());
+  const client = mock.clients[0];
+  client.options.callbacks?.onError?.({
+    error: 'SLNG TTS context test abandoned: interrupted mid-utterance',
+  } as never);
+
+  expect(voiceProvider.isConnected()).toBe(true);
+  expect(client.disconnect).not.toHaveBeenCalled();
+  expect(useRecommendationStore.getState().error).toBeNull();
+  expect(useVoiceStore.getState().status).toBe('listening');
+});
+
+it('mutes only the local microphone while keeping the voice session connected', async () => {
+  await voiceProvider.connect(context());
+  const client = mock.clients[0];
+
+  voiceProvider.setMicrophoneMuted(true);
+  expect(client.enableMic).toHaveBeenLastCalledWith(false);
+  expect(voiceProvider.isConnected()).toBe(true);
+  expect(voiceProvider.isListening()).toBe(true);
+  expect(voiceProvider.isMicrophoneMuted()).toBe(true);
+  expect(useVoiceStore.getState().micMuted).toBe(true);
+  expect(client.disconnect).not.toHaveBeenCalled();
+
+  await voiceProvider.stopListening();
+  await voiceProvider.startListening();
+  expect(client.enableMic).toHaveBeenLastCalledWith(false);
+
+  expect(voiceProvider.toggleMicrophoneMuted()).toBe(false);
+  expect(client.enableMic).toHaveBeenLastCalledWith(true);
+  expect(useVoiceStore.getState().micMuted).toBe(false);
+});

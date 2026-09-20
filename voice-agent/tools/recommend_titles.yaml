@@ -15,6 +15,9 @@ input:
           description: Maximum runtime in minutes.
         mood:
           type: string
+        query:
+          type: string
+          description: Subject, setting, person or free-text theme, such as animals, space or a maze. Do not put these in genre.
         content_types:
           type: array
           items:
@@ -31,6 +34,8 @@ input:
               duration:
                 type: integer
               mood:
+                type: string
+              query:
                 type: string
             additionalProperties: false
       additionalProperties: false

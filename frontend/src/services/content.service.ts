@@ -9,6 +9,9 @@ export interface BackendItem {
   matched_genre: string | null;
   release_year?: number | null;
   vote_average?: number | null;
+  poster_path?: string | null;
+  backdrop_path?: string | null;
+  synopsis?: string | null;
   channel?: string | null;
   air_date?: string | null;
   start_time?: string | null;
@@ -47,6 +50,10 @@ export function adaptContent(item: BackendItem, reason?: string): Content {
     : item.content_type === 'sport'
       ? [item.league, item.match_date, item.kickoff_cet].filter(Boolean).join(' · ')
       : '';
+  const imagePath = item.poster_path ?? item.backdrop_path;
+  const posterUrl = imagePath?.startsWith('/')
+    ? `https://image.tmdb.org/t/p/w500${imagePath}`
+    : null;
 
   return {
     id,
@@ -56,11 +63,12 @@ export function adaptContent(item: BackendItem, reason?: string): Content {
     duration: minutes && minutes > 0 ? `${minutes} min` : 'Runtime unknown',
     maturityRating: item.rating || 'Rating unavailable',
     genres: item.genres,
-    synopsis: details || 'Synopsis not provided by the catalogue.',
+    synopsis: item.synopsis || details || 'Synopsis not provided by the catalogue.',
     recommendationReason: reason ?? (item.matched_genre
       ? `Matches ${item.matched_genre}.`
       : 'Selected by the recommendation service.'),
     theme: themes[themeIndex % themes.length],
+    posterUrl,
   };
 }
 

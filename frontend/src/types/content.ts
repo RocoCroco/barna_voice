@@ -19,6 +19,7 @@ export interface Content {
   synopsis: string;
   recommendationReason: string;
   theme: ContentTheme;
+  posterUrl?: string | null;
 }
 
 export type RecommendationMode = 'discover' | 'consensus' | 'decide';

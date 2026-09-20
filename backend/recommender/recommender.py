@@ -26,6 +26,7 @@ MATCHDAY_CSV = str(BASE_DIR / "matchday.csv")
 MOVIE_COLUMNS = [
     "title", "genres", "runtime", "vote_average",
     "vote_count", "popularity", "overview", "keywords", "release_date",
+    "poster_path", "backdrop_path",
 ]
 
 # Rank scores keep genre-specific pools sensible: live sport first, then shows,
@@ -59,6 +60,15 @@ MOOD_TERMS = {
     "thoughtful": ["philosophy", "mystery", "dystopia", "science"],
 }
 
+# Natural subject requests should not be forced into a genre. These aliases
+# make common sofa-language useful against the catalogue's synopsis/keywords.
+TOPIC_TERMS = {
+    "animal": ["animal", "animals", "dog", "cat", "pet", "wildlife", "horse", "bird"],
+    "animals": ["animal", "animals", "dog", "cat", "pet", "wildlife", "horse", "bird"],
+    "maze": ["maze", "labyrinth"],
+    "dinosaurs": ["dinosaur", "dinosaurs", "jurassic"],
+}
+
 ALL_CONTENT_TYPES = ("movie", "show", "sport")
 
 
@@ -71,10 +81,16 @@ def _norm_movies() -> pd.DataFrame:
         "genres": df["genres"],
         "runtime": pd.to_numeric(df["runtime"], errors="coerce").fillna(0),
         "rank_score": pd.to_numeric(df["vote_count"], errors="coerce").fillna(0),
-        "search_text": (df["overview"].fillna("") + " " + df["keywords"].fillna("")).str.lower(),
+        "search_text": (
+            df["title"].fillna("") + " " + df["genres"].fillna("") + " "
+            + df["overview"].fillna("") + " " + df["keywords"].fillna("")
+        ).str.lower(),
     })
     out["vote_average"] = df["vote_average"]
     out["release_year"] = pd.to_datetime(df["release_date"], errors="coerce").dt.year
+    out["poster_path"] = df["poster_path"]
+    out["backdrop_path"] = df["backdrop_path"]
+    out["synopsis"] = df["overview"]
     return out
 
 
@@ -150,9 +166,13 @@ def _to_item(row, matched_genre: Optional[str] = None) -> dict:
         "runtime_minutes": int(row["runtime"]) if row["runtime"] else None,
         "matched_genre": matched_genre,
     }
+    if "synopsis" in row.index and pd.notna(row["synopsis"]):
+        item["synopsis"] = str(row["synopsis"])
     if row["content_type"] == "movie":
         item["vote_average"] = float(row["vote_average"]) if pd.notna(row["vote_average"]) else None
         item["release_year"] = int(row["release_year"]) if pd.notna(row["release_year"]) else None
+        item["poster_path"] = row["poster_path"] if pd.notna(row["poster_path"]) else None
+        item["backdrop_path"] = row["backdrop_path"] if pd.notna(row["backdrop_path"]) else None
     elif row["content_type"] == "show":
         item["channel"] = row["channel"]
         item["start_time"] = row["start_time"]
@@ -182,14 +202,34 @@ def _mood_to_terms(mood: Optional[str]) -> list[str]:
     return terms
 
 
-def _apply_filters(df: pd.DataFrame, max_runtime: Optional[int], mood: Optional[str]) -> pd.DataFrame:
+def _topic_to_terms(query: Optional[str]) -> list[str]:
+    if not query:
+        return []
+    words = [w.strip().lower() for w in re.split(r"[^\w]+", query) if len(w.strip()) > 2]
+    terms: list[str] = []
+    for word in words:
+        terms.extend(TOPIC_TERMS.get(word, [word[:-1] if word.endswith("s") else word]))
+    return list(dict.fromkeys(terms))
+
+
+def _filter_search_text(df: pd.DataFrame, terms: list[str]) -> pd.DataFrame:
+    if not terms:
+        return df
+    pattern = "|".join(rf"\b{re.escape(term)}\b" for term in terms)
+    return df[df["search_text"].str.contains(pattern, na=False)]
+
+
+def _apply_filters(
+    df: pd.DataFrame,
+    max_runtime: Optional[int],
+    mood: Optional[str],
+    query: Optional[str] = None,
+) -> pd.DataFrame:
     out = df
     if max_runtime:
         out = out[(out["runtime"] > 0) & (out["runtime"] <= max_runtime)]
-    terms = _mood_to_terms(mood)
-    if terms:
-        pattern = "|".join(re.escape(t) for t in terms)
-        out = out[out["search_text"].str.contains(pattern, na=False)]
+    out = _filter_search_text(out, _mood_to_terms(mood))
+    out = _filter_search_text(out, _topic_to_terms(query))
     return out
 
 
@@ -263,10 +303,30 @@ def _top_of_type(content_type: str, seen: set[str], n: int = 1) -> list[dict]:
     return items
 
 
-def decide_for_me(user_id: str, k: int = 8, content_types: Optional[list[str]] = None) -> dict:
+def decide_for_me(
+    user_id: str,
+    k: int = 8,
+    content_types: Optional[list[str]] = None,
+    randomize: bool = False,
+) -> dict:
     """Logs-only: rank by learned genre preference, with a bit of live variety."""
     types = _resolve_types(content_types)
     weights = _log_weights(user_id)
+
+    if randomize:
+        pool = _pool(types)
+        if weights:
+            pattern = "|".join(re.escape(genre) for genre in weights)
+            preferred = pool[pool["genres"].str.contains(pattern, na=False)]
+            if not preferred.empty:
+                pool = preferred
+        sample = pool.sample(n=min(k, len(pool))) if not pool.empty else pool
+        return {
+            "mode": "decide_for_me", "user_id": user_id,
+            "status": "success" if not sample.empty else "no_matches",
+            "genre_weights": weights,
+            "items": [_to_item(row) for _, row in sample.iterrows()],
+        }
 
     items: list[dict] = []
     seen: set[str] = set()
@@ -294,6 +354,7 @@ def recommend_by_preference(
     genre: Optional[str] = None,
     duration: Optional[int] = None,
     mood: Optional[str] = None,
+    query: Optional[str] = None,
     k: int = 8,
     content_types: Optional[list[str]] = None,
 ) -> dict:
@@ -301,20 +362,19 @@ def recommend_by_preference(
     base = _pool(content_types)
     catalog_genre = GENRE_MAP.get(genre, genre) if genre else None
     if catalog_genre:
-        base = base[base["genres"].str.contains(re.escape(catalog_genre), na=False)]
-    base = _apply_filters(base, duration, mood)
+        genre_matches = base[base["genres"].str.contains(re.escape(catalog_genre), na=False)]
+        if genre_matches.empty:
+            query = " ".join(part for part in [query, genre] if part)
+            catalog_genre = None
+        else:
+            base = genre_matches
+    base = _apply_filters(base, duration, mood, query)
 
     ranked = base.sort_values("rank_score", ascending=False).head(k)
     items = [_to_item(row, matched_genre=catalog_genre) for _, row in ranked.iterrows()]
 
-    if len(items) < k:
-        seen = {item["title"] for item in items}
-        fill = _pool(content_types)
-        fill = fill[~fill["title"].isin(seen)].sort_values("rank_score", ascending=False)
-        items.extend(_to_item(row) for _, row in fill.head(k - len(items)).iterrows())
-
     return {"mode": "preference", "genre": genre, "duration": duration, "mood": mood,
-            "status": "success", "items": items[:k]}
+            "query": query, "status": "success" if items else "no_matches", "items": items[:k]}
 
 
 def recommend_for_room(participants: list[dict], k: int = 8,
@@ -323,6 +383,7 @@ def recommend_for_room(participants: list[dict], k: int = 8,
     merged: dict[str, float] = defaultdict(float)
     durations: list[int] = []
     moods: list[str] = []
+    queries: list[str] = []
 
     for person in participants:
         for genre, weight in _normalized_pref_weights(
@@ -333,11 +394,14 @@ def recommend_for_room(participants: list[dict], k: int = 8,
             durations.append(person["duration"])
         if person.get("mood"):
             moods.append(person["mood"])
+        if person.get("query"):
+            queries.append(person["query"])
 
     # Everyone must fit their time budget -> use the tightest one.
     max_runtime = min(durations) if durations else None
     mood = " ".join(moods) if moods else None
-    base = _apply_filters(_pool(content_types), max_runtime, mood)
+    query = " ".join(queries) if queries else None
+    base = _apply_filters(_pool(content_types), max_runtime, mood, query)
 
     if merged:
         items = _select_by_weights(dict(merged), k, base)

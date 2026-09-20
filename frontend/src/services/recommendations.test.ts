@@ -47,7 +47,9 @@ describe('content identity and session cache', () => {
 describe('backend recommendation modes', () => {
   it.each([
     ['discover', 'preference', { genre: 'Sci-Fi', duration: 120, mood: 'calm', count: 8 }],
-    ['decide', 'decide', { user_id: 'viewer', count: 8 }],
+    ['decide', 'decide', {
+      user_id: 'viewer', count: 1, content_types: ['movie'], randomize: true,
+    }],
     ['consensus', 'room', {
       participants: [{ user_id: 'viewer', genre: 'Sci-Fi', duration: 120, mood: 'calm' }], count: 8,
     }],

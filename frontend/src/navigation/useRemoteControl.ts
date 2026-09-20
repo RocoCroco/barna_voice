@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { focusManager, type FocusDirection } from './FocusManager';
+import { voiceProvider } from '../voice/VoiceProvider';
 
 const directionByKey: Partial<Record<string, FocusDirection>> = {
   ArrowUp: 'up',
@@ -62,6 +63,13 @@ export function useRemoteControl(): void {
       if (event.key.toLowerCase() === 'v' && !isTextInput(event.target)) {
         event.preventDefault();
         document.querySelector<HTMLElement>('[data-voice-trigger="true"]')?.click();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'm' && !event.repeat && !isTextInput(event.target)
+        && voiceProvider.isConnected()) {
+        event.preventDefault();
+        voiceProvider.toggleMicrophoneMuted();
       }
     };
 

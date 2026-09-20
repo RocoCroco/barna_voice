@@ -110,6 +110,29 @@ async def recommendation_session(
 
 def session_prompt() -> str:
     session = current_session.get()
+    mode_contract = {
+        "discover": "Ask at most two useful questions, then recommend. Put subjects like animals or a maze in query.",
+        "consensus": "First ask how many people there are. Ask each person exactly one short question, then recommend with one anonymous participant per person.",
+        "decide": "A surprise movie is selected automatically when the client becomes ready. Do not call recommend_titles again unless the viewer asks for another pick.",
+    }[session.mode]
     return "\nActive session context (use these exact IDs in tools):\n" + json.dumps({
         "profile_id": session.profile_id, "session_id": session.session_id, "mode": session.mode,
-    })
+    }) + "\nMandatory mode contract: " + mode_contract
+
+
+async def session_startup_message() -> str:
+    session = current_session.get()
+    if session.mode == "consensus":
+        return "Hi, I'm Compass. How many people are choosing tonight?"
+    if session.mode != "decide":
+        return "Hi, I'm Compass. What are you in the mood to watch?"
+
+    result = await session.recommend({})
+    items = result.get("items")
+    if not isinstance(items, list) or not items:
+        return "I couldn't choose a movie right now. Please try again."
+    item = items[0]
+    title = str(item.get("title", "this movie"))
+    synopsis = str(item.get("synopsis") or "").split(".", 1)[0].strip()
+    summary = " ".join(synopsis.split()[:14])
+    return f"I picked {title}. {summary}." if summary else f"I picked {title}. It is tonight's surprise choice."

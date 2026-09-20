@@ -76,8 +76,12 @@ export function ContentDetailsPage() {
             {selectedContentId === content.id ? 'Selected. Playback integration comes next.' : ''}
           </p>
         </div>
-        <div className="details-hero__art" aria-hidden="true">
-          {content.title.slice(0, 1)}
+        <div
+          className={`details-hero__art ${content.posterUrl ? 'details-hero__art--image' : ''}`}
+          style={content.posterUrl ? { backgroundImage: `url("${content.posterUrl}")` } : undefined}
+          aria-hidden="true"
+        >
+          {!content.posterUrl && content.title.slice(0, 1)}
         </div>
       </section>
 

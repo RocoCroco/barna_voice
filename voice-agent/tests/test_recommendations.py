@@ -39,11 +39,16 @@ class RecommendationTests(unittest.IsolatedAsyncioTestCase):
             url, profile, body = request.call_args.args
             self.assertEqual(url, f"http://backend/api/content/{endpoint}")
             self.assertEqual(profile, "viewer")
-            self.assertEqual(body["count"], 8)
             if mode == "decide":
+                self.assertEqual(body["count"], 1)
+                self.assertEqual(body["content_types"], ["movie"])
+                self.assertTrue(body["randomize"])
                 self.assertEqual(body["user_id"], "viewer")
             elif mode == "consensus":
+                self.assertEqual(body["count"], 8)
                 self.assertEqual(body["participants"], [{"user_id": "viewer"}])
+            else:
+                self.assertEqual(body["count"], 8)
             event = self.emit.call_args.args[0]
             self.assertEqual(event["type"], "recommendations.updated")
             self.assertEqual(event["profileId"], "viewer")
@@ -62,6 +67,13 @@ class RecommendationTests(unittest.IsolatedAsyncioTestCase):
             await refine_recommendations("session", {"duration": None})
             self.assertIsNone(request.call_args.args[2]["duration"])
         self.assertEqual(self.session.revision, 3)
+
+    async def test_subject_query_is_forwarded_and_retained(self):
+        with patch("tools.recommendations._request", return_value=RESPONSE) as request:
+            await recommend_titles("viewer", {"query": "animals"})
+            self.assertEqual(request.call_args.args[2]["query"], "animals")
+            await refine_recommendations("session", {"duration": 100})
+            self.assertEqual(request.call_args.args[2]["query"], "animals")
 
     async def test_profile_session_and_cache_isolation(self):
         with patch("tools.recommendations._request", return_value=RESPONSE) as request:

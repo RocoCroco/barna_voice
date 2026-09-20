@@ -13,7 +13,7 @@ def patch_generated(build_directory: Path) -> None:
     replacements = {
         "from pipecat_slng import SlngSTTService":
             "from slng_stt_batched import BatchedSlngSTTService\n"
-            "from compass_session import recommendation_session, recommendation_tools, session_prompt",
+            "from compass_session import recommendation_session, recommendation_tools, session_prompt, session_startup_message",
         "return SlngSTTService(": "return BatchedSlngSTTService(",
         "system_instruction=COMPASS_PROMPT,": "system_instruction=COMPASS_PROMPT + session_prompt(),",
         "        await _run_bot(transport, runner_args, dev)":
@@ -27,6 +27,8 @@ def patch_generated(build_directory: Path) -> None:
         "tools.get_content_details.get_content_details(": "tools.recommendations.get_content_details(",
         "tools=[end_call, recommend_titles, refine_recommendations, get_content_details]":
             "tools=[end_call, *recommendation_tools()]",
+        'TTSSpeakFrame("Hi, I\'m Compass. What are you in the mood to watch?")':
+            "TTSSpeakFrame(await session_startup_message())",
     }
     for old, new in replacements.items():
         if source.count(old) != 1:
