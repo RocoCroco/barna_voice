@@ -11,6 +11,20 @@ agent, and a FastAPI backend prototype. The backend already serves a unified
 content catalogue (movies, TV schedule and live football), activity logs and
 ML-based recommendations. The frontend and voice tools use its existing endpoints.
 
+## Docker deployment
+
+Build and run all three services with Docker Compose. The
+[deployment guide](./DEPLOYMENT.md) covers runtime credentials, persistent data,
+automatic HTTPS and WebRTC networking.
+
+```bash
+cp .env.example .env
+# Fill in SLNG_API_KEY and NEBIUS_API_KEY in .env.
+docker compose up -d --build --wait --wait-timeout 180
+```
+
+The local interface is available at [http://localhost:8080](http://localhost:8080).
+
 ## Current status
 
 | Area | Status | Notes |
