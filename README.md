@@ -1,21 +1,56 @@
-# Compass
+<p align="center">
+  <img src="./frontend/public/brand/logo.svg" alt="Compass" width="420" />
+</p>
 
-Compass is a voice-first movie and series discovery experience designed for the
-living-room TV. Instead of opening a catalogue and scrolling indefinitely, the
-viewer describes the mood, occasion and constraints out loud. Compass holds a
-short conversation and will progressively turn that context into a small,
-understandable set of recommendations.
+<h1 align="center">Discover what to watch — by talking.</h1>
 
-This repository contains the TV frontend, the independently deployable voice
-agent, and a FastAPI backend prototype. The backend already serves a unified
-content catalogue (movies, TV schedule and live football), activity logs and
-ML-based recommendations. The frontend and voice tools use its existing endpoints.
+<p align="center">
+  A voice-first entertainment experience built for the living-room TV.<br />
+  Tell Compass your mood, occasion and constraints; get a small set of recommendations that actually make sense.
+</p>
 
-## Docker deployment
+<p align="center">
+  <img alt="Working MVP" src="https://img.shields.io/badge/status-working_MVP-13C8EC?style=flat-square" />
+  <img alt="SLNG challenge winner" src="https://img.shields.io/badge/SLNG_challenge-winner-F6D84A?style=flat-square" />
+  <img alt="React 19" src="https://img.shields.io/badge/React-19-13C8EC?style=flat-square&amp;logo=react&amp;logoColor=white" />
+  <img alt="Python 3.12" src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" />
+  <img alt="Docker Compose" src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&amp;logo=docker&amp;logoColor=white" />
+</p>
 
-Build and run all three services with Docker Compose. The
-[deployment guide](./DEPLOYMENT.md) covers runtime credentials, persistent data,
-automatic HTTPS and WebRTC networking.
+<p align="center">
+  <a href="#why-compass">Why Compass</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#product-experience">Product experience</a> ·
+  <a href="#documentation">Documentation</a>
+</p>
+
+<p align="center">
+  <img src="./screenshots/branding.png" alt="Compass brand and product overview" width="100%" />
+</p>
+
+## Why Compass
+
+Streaming catalogues make people scroll when what they really want is help
+deciding. Compass replaces the endless grid with a short, natural conversation:
+
+- **Speak naturally.** Describe a mood, who is watching or how much time you have.
+- **Refine in real time.** Recommendations evolve as the conversation adds context.
+- **Stay in control.** Pause the conversation, explore a title and return without
+  losing the session.
+- **Designed for television.** Every important action works with directional
+  focus, OK/Back and a voice shortcut.
+
+This repository contains the React TV interface, an independently deployable
+Pipecat voice agent and a FastAPI recommendation backend. Together they serve a
+unified catalogue of movies, television schedules and live football.
+
+## Quick start
+
+### Docker Compose (recommended)
+
+Copy the environment template, add the two provider credentials and start the
+complete stack:
 
 ```bash
 cp .env.example .env
@@ -23,7 +58,21 @@ cp .env.example .env
 docker compose up -d --build --wait --wait-timeout 180
 ```
 
-The local interface is available at [http://localhost:8080](http://localhost:8080).
+Open **[localhost:8080](http://localhost:8080)** and allow microphone access when
+prompted. The first build downloads dependencies, trains the sample models and
+compiles the voice runtime, so it can take a few minutes.
+
+```bash
+# Inspect the stack
+docker compose ps
+docker compose logs --tail=100 backend voice-agent frontend
+
+# Stop it without deleting persistent data
+docker compose down
+```
+
+See the [deployment guide](./DEPLOYMENT.md) for production credentials,
+persistent data, automatic HTTPS and WebRTC networking.
 
 ## Current status
 
@@ -80,6 +129,24 @@ Nebius.
 | Nebius Token Factory | Voice runtime | Conversational reasoning model |
 | Silero | Voice runtime | Local voice activity and turn detection |
 
+## Product experience
+
+The interface moves from a calm, voice-led home screen into a focused
+conversation and then reveals recommendations without leaving the session.
+Click any image to view it at full size.
+
+| Home | Voice conversation |
+| :---: | :---: |
+| [![Compass home screen](./screenshots/home.PNG)](./screenshots/home.PNG) | [![Compass listening screen](./screenshots/Listening.PNG)](./screenshots/Listening.PNG) |
+| Start with one clear action: press to talk. | Live visual states make listening and speaking explicit. |
+
+### Recommendations that remain conversational
+
+[![Compass recommendation board](./screenshots/Recomendations.PNG)](./screenshots/Recomendations.PNG)
+
+Results appear as a TV-friendly board while the voice agent remains available
+to refine the selection — for example by changing genre, mood or runtime.
+
 ## Hackathon challenge strategy
 
 ### Titan OS: TV-first experience
@@ -99,7 +166,7 @@ The current limitation is explicit: it has not yet been validated on a Titan OS
 television. The browser build simulates screen proportions, remote navigation
 and interaction flow until device access is available.
 
-### Best use of the SLNG platform
+### Best use of the SLNG platform 🥇 (winners of the challenge)
 
 SLNG is in the critical audio path, not an optional add-on:
 
@@ -136,7 +203,7 @@ recommendation and cached-detail tools using the active
 This is a meaningful dependency: replacing or removing Nebius removes the
 reasoning layer of the live agent rather than a peripheral feature.
 
-## Run locally
+## Manual local setup
 
 ### 1. Start the backend
 
@@ -197,6 +264,7 @@ Open `http://localhost:5173`. Allow microphone access when prompted.
 
 ## Documentation
 
+- [Deployment and operations](./DEPLOYMENT.md)
 - [Frontend architecture](./FRONTEND.md)
 - [Backend architecture](./BACKEND.md)
 - [Product flow and voice UX](./PRODUCT_FLOW.md)
@@ -223,3 +291,10 @@ that connection. Leaving the session for Home or profiles clears its context.
 The backend has no content-by-ID route: details are available only for items
 cached during this session. Refreshing the browser loses that cache.
 Playback and provider deep links remain future work.
+
+---
+
+<p align="center">
+  <img src="./frontend/public/brand/icon.svg" alt="Compass icon" width="42" /><br />
+  <strong>Good movies. Better conversations.</strong>
+</p>
